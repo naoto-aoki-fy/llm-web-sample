@@ -9,7 +9,6 @@
       color-scheme: light dark;
 
       --bg: #f6f8fc;
-      --bg-glow: #dfe8ff;
       --panel: #ffffff;
       --panel2: #f1f4fa;
       --text: #172033;
@@ -33,7 +32,6 @@
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #0b1020;
-        --bg-glow: #1e2f5c;
         --panel: #121a2f;
         --panel2: #17213a;
         --text: #e7ecf7;
@@ -242,11 +240,11 @@
 
           <label for="baseUrl">Endpoint URL</label>
           <input id="baseUrl" type="url" placeholder="https://api.example.com or https://api.example.com/v1" autocomplete="off" />
-          <div class="hint">The URL is normalized so it works with or without a trailing <code>/v1</code>.</div>
+          <div class="hint">The URL is normalized so it works whether or not it ends with <code>/v1</code>.</div>
 
           <label for="apiKey">API Key</label>
           <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
-          <div class="hint">This is stored in localStorage. Do not use this on shared computers or public terminals.</div>
+          <div class="hint">The API key is encrypted before being stored in localStorage. The decryption secret is stored in the URL fragment as <code>#?key=...</code>. Keep the full URL private.</div>
 
           <div class="btns">
             <button id="saveSettingsBtn">Save Settings</button>
@@ -260,7 +258,7 @@
 
           <label for="modelSelect">Model</label>
           <select id="modelSelect">
-            <option value="">No models loaded</option>
+            <option value="">Models not loaded</option>
           </select>
 
           <div class="btns">
@@ -271,13 +269,13 @@
       </section>
 
       <section class="card">
-        <h2>3. Send Chat Request</h2>
+        <h2>3. Chat Completion</h2>
 
         <label for="promptInput">Prompt</label>
         <textarea id="promptInput" placeholder="Enter your prompt here"></textarea>
 
         <details>
-          <summary>Optional Parameters</summary>
+          <summary>Optional parameters</summary>
           <div class="row">
             <div>
               <label for="temperature">temperature</label>
@@ -285,7 +283,7 @@
             </div>
             <div>
               <label for="maxTokens">max_tokens</label>
-              <input id="maxTokens" type="number" min="1" step="1" placeholder="Leave blank to omit" />
+              <input id="maxTokens" type="number" min="1" step="1" placeholder="Leave empty to omit" />
             </div>
           </div>
         </details>
@@ -301,7 +299,7 @@
         <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
         <div class="meta">
-          <span>Live Response</span>
+          <span>Streaming response</span>
           <span id="tokenCounter">0 chars</span>
         </div>
         <div id="output" class="output" aria-live="polite"></div>
@@ -310,7 +308,10 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
+    const STORAGE_KEY = "openai-compatible-chat-client-settings:v2";
+    const LEGACY_STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
+    const SECRET_KEY_BYTES = 32;
+    const PBKDF2_ITERATIONS = 210000;
 
     const el = {
       baseUrl: document.getElementById("baseUrl"),
@@ -333,10 +334,156 @@
     };
 
     let abortController = null;
+    let secretKeyText = "";
 
     function setStatus(node, message, type = "") {
       node.textContent = message;
       node.className = `status ${type}`.trim();
+    }
+
+    function requireWebCrypto() {
+      if (!window.crypto?.subtle || !window.crypto?.getRandomValues) {
+        throw new Error("This browser does not support the Web Crypto API required for encrypted localStorage.");
+      }
+    }
+
+    function base64UrlEncode(bytes) {
+      let binary = "";
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+      return btoa(binary)
+        .replaceAll("+", "-")
+        .replaceAll("/", "_")
+        .replaceAll("=", "");
+    }
+
+    function base64UrlDecode(value) {
+      const normalized = value
+        .replaceAll("-", "+")
+        .replaceAll("_", "/");
+      const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+      const binary = atob(padded);
+      return Uint8Array.from(binary, char => char.charCodeAt(0));
+    }
+
+    function generateSecretKeyText() {
+      const bytes = new Uint8Array(SECRET_KEY_BYTES);
+      crypto.getRandomValues(bytes);
+      return base64UrlEncode(bytes);
+    }
+
+    function getSecretKeyFromUrl() {
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+
+      if (!hash) return "";
+
+      const queryText = hash.startsWith("?") ? hash.slice(1) : hash;
+      const params = new URLSearchParams(queryText);
+      return params.get("key") || "";
+    }
+
+    function ensureSecretKeyInUrl() {
+      requireWebCrypto();
+
+      let key = getSecretKeyFromUrl();
+      if (key) return key;
+
+      key = generateSecretKeyText();
+      const urlWithoutHash = window.location.href.split("#")[0];
+      const replacementUrl = `${urlWithoutHash}#?key=${encodeURIComponent(key)}`;
+      window.location.replace(replacementUrl);
+      return key;
+    }
+
+    async function deriveEncryptionKey(secret, salt, iterations = PBKDF2_ITERATIONS) {
+      const encoder = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(secret),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+
+      return crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt,
+          iterations,
+          hash: "SHA-256",
+        },
+        keyMaterial,
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptString(plainText) {
+      if (!plainText) return null;
+
+      const encoder = new TextEncoder();
+      const salt = new Uint8Array(16);
+      const iv = new Uint8Array(12);
+      crypto.getRandomValues(salt);
+      crypto.getRandomValues(iv);
+
+      const key = await deriveEncryptionKey(secretKeyText, salt);
+      const encrypted = await crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv,
+        },
+        key,
+        encoder.encode(plainText)
+      );
+
+      return {
+        alg: "AES-GCM",
+        kdf: "PBKDF2-SHA256",
+        iterations: PBKDF2_ITERATIONS,
+        salt: base64UrlEncode(salt),
+        iv: base64UrlEncode(iv),
+        data: base64UrlEncode(new Uint8Array(encrypted)),
+      };
+    }
+
+    async function decryptString(payload) {
+      if (!payload) return "";
+
+      if (
+        payload.alg !== "AES-GCM" ||
+        payload.kdf !== "PBKDF2-SHA256" ||
+        !payload.salt ||
+        !payload.iv ||
+        !payload.data
+      ) {
+        throw new Error("The saved API key uses an unsupported encrypted storage format.");
+      }
+
+      const decoder = new TextDecoder();
+      const salt = base64UrlDecode(payload.salt);
+      const iv = base64UrlDecode(payload.iv);
+      const data = base64UrlDecode(payload.data);
+      const iterations = Number(payload.iterations) || PBKDF2_ITERATIONS;
+      const key = await deriveEncryptionKey(secretKeyText, salt, iterations);
+
+      const decrypted = await crypto.subtle.decrypt(
+        {
+          name: "AES-GCM",
+          iv,
+        },
+        key,
+        data
+      );
+
+      return decoder.decode(decrypted);
     }
 
     function normalizeBaseUrl(raw) {
@@ -362,36 +509,83 @@
       return headers;
     }
 
-    function saveSettings() {
+    async function writeEncryptedSettings(settings) {
+      const encryptedApiKey = await encryptString(settings.apiKey);
+      const payload = {
+        version: 2,
+        baseUrl: settings.baseUrl,
+        apiKeyEncrypted: encryptedApiKey,
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    }
+
+    async function saveSettings() {
       try {
         const settings = getSettings();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        setStatus(el.settingsStatus, "Settings saved to localStorage.", "ok");
+        await writeEncryptedSettings(settings);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        setStatus(el.settingsStatus, "Settings were saved. The API key is encrypted in localStorage.", "ok");
       } catch (error) {
         setStatus(el.settingsStatus, error.message, "err");
       }
     }
 
-    function loadSettings() {
+    async function loadSettings() {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
+      const legacySaved = localStorage.getItem(LEGACY_STORAGE_KEY);
+
+      if (!saved && !legacySaved) {
+        setStatus(el.settingsStatus, "Secret key is available in the URL fragment. No saved settings found.", "ok");
+        return;
+      }
+
       try {
-        const settings = JSON.parse(saved);
-        el.baseUrl.value = settings.baseUrl || "";
-        el.apiKey.value = settings.apiKey || "";
-        setStatus(el.settingsStatus, "Saved settings loaded.", "ok");
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-        setStatus(el.settingsStatus, "Saved settings were corrupted and have been removed.", "warn");
+        if (saved) {
+          const settings = JSON.parse(saved);
+          el.baseUrl.value = settings.baseUrl || "";
+
+          if (settings.apiKeyEncrypted) {
+            el.apiKey.value = await decryptString(settings.apiKeyEncrypted);
+          } else if (settings.apiKey) {
+            el.apiKey.value = settings.apiKey;
+            await writeEncryptedSettings({
+              baseUrl: settings.baseUrl || "",
+              apiKey: settings.apiKey || "",
+            });
+          }
+
+          setStatus(el.settingsStatus, "Saved settings were loaded. The API key was decrypted with the URL secret key.", "ok");
+          return;
+        }
+
+        const legacySettings = JSON.parse(legacySaved);
+        el.baseUrl.value = legacySettings.baseUrl || "";
+        el.apiKey.value = legacySettings.apiKey || "";
+
+        await writeEncryptedSettings({
+          baseUrl: legacySettings.baseUrl || "",
+          apiKey: legacySettings.apiKey || "",
+        });
+
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        setStatus(el.settingsStatus, "Legacy plaintext settings were loaded and migrated to encrypted storage.", "warn");
+      } catch (error) {
+        setStatus(
+          el.settingsStatus,
+          `Could not load saved settings. The URL secret key may be different from the one used to save them. ${error.message}`,
+          "err"
+        );
       }
     }
 
     function clearSettings() {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       el.baseUrl.value = "";
       el.apiKey.value = "";
-      el.modelSelect.innerHTML = '<option value="">No models loaded</option>';
-      setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
+      el.modelSelect.innerHTML = '<option value="">Models not loaded</option>';
+      setStatus(el.settingsStatus, "Saved settings were cleared. The URL secret key was kept unchanged.", "ok");
     }
 
     async function loadModels() {
@@ -404,7 +598,7 @@
       }
 
       el.loadModelsBtn.disabled = true;
-      setStatus(el.modelsStatus, "Loading model list...", "");
+      setStatus(el.modelsStatus, "Loading models...", "");
 
       try {
         const response = await fetch(`${settings.baseUrl}/models`, {
@@ -436,7 +630,7 @@
           el.modelSelect.value = previouslySelected;
         }
 
-        setStatus(el.modelsStatus, `Loaded ${models.length} models.`, "ok");
+        setStatus(el.modelsStatus, `${models.length} models loaded.`, "ok");
       } catch (error) {
         setStatus(el.modelsStatus, error.message, "err");
       } finally {
@@ -493,7 +687,7 @@
       if (maxTokensRaw !== "") {
         const maxTokens = Number(maxTokensRaw);
         if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
-          throw new Error("max_tokens must be an integer of 1 or greater.");
+          throw new Error("max_tokens must be an integer greater than or equal to 1.");
         }
         body.max_tokens = maxTokens;
       }
@@ -529,11 +723,11 @@
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => "");
-          throw new Error(`Failed to send chat request: HTTP ${response.status} ${errorText}`.trim());
+          throw new Error(`Chat request failed: HTTP ${response.status} ${errorText}`.trim());
         }
 
         if (!response.body) {
-          throw new Error("The response does not support ReadableStream.");
+          throw new Error("The response does not provide a ReadableStream.");
         }
 
         setStatus(el.chatStatus, "Receiving stream...", "");
@@ -590,17 +784,31 @@
         const choice = json.choices?.[0];
         const delta = choice?.delta;
 
-        // Most OpenAI-compatible APIs use delta.content. Check text as a fallback for implementation differences.
+        // Most OpenAI-compatible APIs use delta.content. Some implementations return text.
         const text = delta?.content ?? choice?.text ?? "";
         if (text) appendOutput(text);
       } catch (error) {
-        // Lenient fallback for compatible APIs that return non-JSON SSE data.
+        // Loose fallback for compatible APIs that return non-JSON SSE data.
         appendOutput(data);
       }
     }
 
     function stopStreaming() {
       if (abortController) abortController.abort();
+    }
+
+    async function initialize() {
+      try {
+        secretKeyText = ensureSecretKeyInUrl();
+      } catch (error) {
+        setStatus(el.settingsStatus, error.message, "err");
+        el.saveSettingsBtn.disabled = true;
+        el.loadModelsBtn.disabled = true;
+        el.sendBtn.disabled = true;
+        return;
+      }
+
+      await loadSettings();
     }
 
     el.saveSettingsBtn.addEventListener("click", saveSettings);
@@ -610,7 +818,7 @@
     el.stopBtn.addEventListener("click", stopStreaming);
     el.clearOutputBtn.addEventListener("click", clearOutput);
 
-    loadSettings();
+    initialize();
   </script>
 </body>
 </html>
