@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OpenAI互換API Chat Client</title>
+  <title>OpenAI-Compatible API Chat Client</title>
   <style>
     :root {
       --bg: #0b1020;
@@ -198,52 +198,52 @@
 </head>
 <body>
   <main>
-    <h1>OpenAI互換API Chat Client</h1>
-    <p class="subtitle">ブラウザから <code>/v1/models</code> と <code>/v1/chat/completions</code> に直接アクセスする最小構成クライアント。</p>
+    <h1>OpenAI-Compatible API Chat Client</h1>
+    <p class="subtitle">A minimal browser client that directly accesses <code>/v1/models</code> and <code>/v1/chat/completions</code>.</p>
 
     <div class="grid">
       <section>
         <div class="card">
-          <h2>1. API設定</h2>
+          <h2>1. API Settings</h2>
 
-          <label for="baseUrl">エンドポイントURL</label>
-          <input id="baseUrl" type="url" placeholder="https://api.example.com または https://api.example.com/v1" autocomplete="off" />
-          <div class="hint">末尾が <code>/v1</code> でも、そうでなくても動作するよう正規化します。</div>
+          <label for="baseUrl">Endpoint URL</label>
+          <input id="baseUrl" type="url" placeholder="https://api.example.com or https://api.example.com/v1" autocomplete="off" />
+          <div class="hint">The URL is normalized so it works with or without a trailing <code>/v1</code>.</div>
 
-          <label for="apiKey">APIキー</label>
+          <label for="apiKey">API Key</label>
           <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
-          <div class="hint">localStorageに保存されます。共有PCや公開端末では使用しないでください。</div>
+          <div class="hint">This is stored in localStorage. Do not use this on shared computers or public terminals.</div>
 
           <div class="btns">
-            <button id="saveSettingsBtn">設定を保存</button>
-            <button id="clearSettingsBtn" class="secondary">設定を削除</button>
+            <button id="saveSettingsBtn">Save Settings</button>
+            <button id="clearSettingsBtn" class="secondary">Clear Settings</button>
           </div>
           <div id="settingsStatus" class="status"></div>
         </div>
 
         <div class="card">
-          <h2>2. モデル一覧</h2>
+          <h2>2. Model List</h2>
 
-          <label for="modelSelect">モデル</label>
+          <label for="modelSelect">Model</label>
           <select id="modelSelect">
-            <option value="">モデル未取得</option>
+            <option value="">No models loaded</option>
           </select>
 
           <div class="btns">
-            <button id="loadModelsBtn">モデル一覧を取得</button>
+            <button id="loadModelsBtn">Load Models</button>
           </div>
           <div id="modelsStatus" class="status"></div>
         </div>
       </section>
 
       <section class="card">
-        <h2>3. チャット送信</h2>
+        <h2>3. Send Chat Request</h2>
 
-        <label for="promptInput">プロンプト</label>
-        <textarea id="promptInput" placeholder="ここにプロンプトを入力"></textarea>
+        <label for="promptInput">Prompt</label>
+        <textarea id="promptInput" placeholder="Enter your prompt here"></textarea>
 
         <details>
-          <summary>任意パラメータ</summary>
+          <summary>Optional Parameters</summary>
           <div class="row">
             <div>
               <label for="temperature">temperature</label>
@@ -251,15 +251,15 @@
             </div>
             <div>
               <label for="maxTokens">max_tokens</label>
-              <input id="maxTokens" type="number" min="1" step="1" placeholder="空なら未指定" />
+              <input id="maxTokens" type="number" min="1" step="1" placeholder="Leave blank to omit" />
             </div>
           </div>
         </details>
 
         <div class="btns">
-          <button id="sendBtn">送信</button>
-          <button id="stopBtn" class="danger" disabled>停止</button>
-          <button id="clearOutputBtn" class="secondary">出力をクリア</button>
+          <button id="sendBtn">Send</button>
+          <button id="stopBtn" class="danger" disabled>Stop</button>
+          <button id="clearOutputBtn" class="secondary">Clear Output</button>
         </div>
 
         <div id="chatStatus" class="status"></div>
@@ -267,7 +267,7 @@
         <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
         <div class="meta">
-          <span>リアルタイム応答</span>
+          <span>Live Response</span>
           <span id="tokenCounter">0 chars</span>
         </div>
         <div id="output" class="output" aria-live="polite"></div>
@@ -307,11 +307,11 @@
 
     function normalizeBaseUrl(raw) {
       const value = raw.trim().replace(/\/+$/, "");
-      if (!value) throw new Error("エンドポイントURLを入力してください。");
+      if (!value) throw new Error("Enter an endpoint URL.");
       try {
         new URL(value);
       } catch {
-        throw new Error("エンドポイントURLがURLとして不正です。");
+        throw new Error("The endpoint URL is not a valid URL.");
       }
       return value.endsWith("/v1") ? value : `${value}/v1`;
     }
@@ -332,7 +332,7 @@
       try {
         const settings = getSettings();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        setStatus(el.settingsStatus, "設定をlocalStorageに保存しました。", "ok");
+        setStatus(el.settingsStatus, "Settings saved to localStorage.", "ok");
       } catch (error) {
         setStatus(el.settingsStatus, error.message, "err");
       }
@@ -345,10 +345,10 @@
         const settings = JSON.parse(saved);
         el.baseUrl.value = settings.baseUrl || "";
         el.apiKey.value = settings.apiKey || "";
-        setStatus(el.settingsStatus, "保存済み設定を読み込みました。", "ok");
+        setStatus(el.settingsStatus, "Saved settings loaded.", "ok");
       } catch {
         localStorage.removeItem(STORAGE_KEY);
-        setStatus(el.settingsStatus, "保存済み設定が壊れていたため削除しました。", "warn");
+        setStatus(el.settingsStatus, "Saved settings were corrupted and have been removed.", "warn");
       }
     }
 
@@ -356,8 +356,8 @@
       localStorage.removeItem(STORAGE_KEY);
       el.baseUrl.value = "";
       el.apiKey.value = "";
-      el.modelSelect.innerHTML = '<option value="">モデル未取得</option>';
-      setStatus(el.settingsStatus, "保存済み設定を削除しました。", "ok");
+      el.modelSelect.innerHTML = '<option value="">No models loaded</option>';
+      setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
     }
 
     async function loadModels() {
@@ -370,7 +370,7 @@
       }
 
       el.loadModelsBtn.disabled = true;
-      setStatus(el.modelsStatus, "モデル一覧を取得中...", "");
+      setStatus(el.modelsStatus, "Loading model list...", "");
 
       try {
         const response = await fetch(`${settings.baseUrl}/models`, {
@@ -380,7 +380,7 @@
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => "");
-          throw new Error(`モデル取得に失敗しました: HTTP ${response.status} ${errorText}`.trim());
+          throw new Error(`Failed to load models: HTTP ${response.status} ${errorText}`.trim());
         }
 
         const json = await response.json();
@@ -389,7 +389,7 @@
           : [];
 
         if (models.length === 0) {
-          throw new Error("レスポンス内にモデルIDが見つかりませんでした。");
+          throw new Error("No model IDs were found in the response.");
         }
 
         models.sort((a, b) => a.localeCompare(b));
@@ -402,7 +402,7 @@
           el.modelSelect.value = previouslySelected;
         }
 
-        setStatus(el.modelsStatus, `${models.length}件のモデルを取得しました。`, "ok");
+        setStatus(el.modelsStatus, `Loaded ${models.length} models.`, "ok");
       } catch (error) {
         setStatus(el.modelsStatus, error.message, "err");
       } finally {
@@ -437,8 +437,8 @@
       const temperatureRaw = el.temperature.value;
       const maxTokensRaw = el.maxTokens.value;
 
-      if (!model) throw new Error("モデルを選択してください。");
-      if (!prompt) throw new Error("プロンプトを入力してください。");
+      if (!model) throw new Error("Select a model.");
+      if (!prompt) throw new Error("Enter a prompt.");
 
       const body = {
         model,
@@ -451,7 +451,7 @@
       if (temperatureRaw !== "") {
         const temperature = Number(temperatureRaw);
         if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
-          throw new Error("temperatureは0〜2の数値にしてください。");
+          throw new Error("temperature must be a number between 0 and 2.");
         }
         body.temperature = temperature;
       }
@@ -459,7 +459,7 @@
       if (maxTokensRaw !== "") {
         const maxTokens = Number(maxTokensRaw);
         if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
-          throw new Error("max_tokensは1以上の整数にしてください。");
+          throw new Error("max_tokens must be an integer of 1 or greater.");
         }
         body.max_tokens = maxTokens;
       }
@@ -482,7 +482,7 @@
       abortController = new AbortController();
       el.sendBtn.disabled = true;
       el.stopBtn.disabled = false;
-      setStatus(el.chatStatus, "送信中...", "");
+      setStatus(el.chatStatus, "Sending...", "");
       clearOutput();
 
       try {
@@ -495,19 +495,19 @@
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => "");
-          throw new Error(`チャット送信に失敗しました: HTTP ${response.status} ${errorText}`.trim());
+          throw new Error(`Failed to send chat request: HTTP ${response.status} ${errorText}`.trim());
         }
 
         if (!response.body) {
-          throw new Error("ReadableStreamに対応していないレスポンスです。");
+          throw new Error("The response does not support ReadableStream.");
         }
 
-        setStatus(el.chatStatus, "ストリーミング受信中...", "");
+        setStatus(el.chatStatus, "Receiving stream...", "");
         await readSseStream(response.body);
-        setStatus(el.chatStatus, "完了しました。", "ok");
+        setStatus(el.chatStatus, "Completed.", "ok");
       } catch (error) {
         if (error.name === "AbortError") {
-          setStatus(el.chatStatus, "停止しました。", "warn");
+          setStatus(el.chatStatus, "Stopped.", "warn");
         } else {
           setStatus(el.chatStatus, error.message, "err");
         }
@@ -556,11 +556,11 @@
         const choice = json.choices?.[0];
         const delta = choice?.delta;
 
-        // OpenAI互換の多くは delta.content。実装差異に備えて text も見る。
+        // Most OpenAI-compatible APIs use delta.content. Check text as a fallback for implementation differences.
         const text = delta?.content ?? choice?.text ?? "";
         if (text) appendOutput(text);
       } catch (error) {
-        // JSONではないSSEデータを返す互換APIへの緩いフォールバック。
+        // Lenient fallback for compatible APIs that return non-JSON SSE data.
         appendOutput(data);
       }
     }
