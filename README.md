@@ -4,38 +4,39 @@ A minimal, single-file browser client for testing OpenAI-compatible chat complet
 
 This client connects directly from the browser to endpoints compatible with:
 
-* `GET /v1/models`
-* `POST /v1/chat/completions`
+- `GET /v1/models`
+- `POST /v1/chat/completions`
 
 It is intended for quick local testing, lightweight demos, and checking whether an OpenAI-compatible API server supports model listing and streaming chat completions.
 
 ## Features
 
-* Single HTML file
-* No build step
-* No external JavaScript dependencies
-* Model list loading from `/v1/models`
-* Streaming chat response support via Server-Sent Events style responses
-* Optional `temperature` and `max_tokens` parameters
-* API settings saved in `localStorage`
-* Light and dark color schemes using `prefers-color-scheme`
-* Solid background styling without gradients
+- Single HTML file
+- No build step
+- No external JavaScript dependencies
+- Model list loading from `/v1/models`
+- Streaming chat response support via Server-Sent Events style responses
+- Optional `temperature` and `max_tokens` parameters
+- API endpoint persistence
+- API key encryption using the browser Web Crypto API
+- Light and dark color schemes using `prefers-color-scheme`
+- Solid background styling without gradients
 
 ## Requirements
 
 You need a browser that supports:
 
-* `fetch`
-* `ReadableStream`
-* `TextDecoder`
-* `localStorage`
+- `fetch`
+- `ReadableStream`
+- `TextDecoder`
+- `localStorage`
+- Web Crypto API, including `crypto.subtle`
 
 The target API server must support browser access, including appropriate CORS headers.
 
 ## Usage
 
 1. Open the HTML file in a modern browser.
-
 2. Enter the API endpoint URL.
 
    Example:
@@ -53,16 +54,47 @@ The target API server must support browser access, including appropriate CORS he
    The client automatically normalizes the base URL to use `/v1`.
 
 3. Enter an API key if required by your API server.
-
 4. Click **Save Settings**.
-
 5. Click **Load Models** to retrieve available models.
-
 6. Select a model.
-
 7. Enter a prompt.
-
 8. Click **Send**.
+
+## Saved Settings
+
+The endpoint URL is saved in `localStorage`.
+
+The API key is not saved directly in `localStorage`. Instead, the client uses the following approach:
+
+1. A random 256-bit local secret is generated if one does not already exist.
+2. The local secret is saved in `localStorage`.
+3. The API key is encrypted with AES-GCM using the local secret.
+4. The encrypted API key is stored in the URL fragment as:
+
+   ```text
+   index.html#?key={escaped_encrypted_key}
+   ```
+
+5. When the page is opened with this URL format, the client decrypts the key and pre-fills the API key form field.
+
+## API Key Encryption: Security Trade-Off
+
+The API key encryption used by this client is a compromise.
+
+It avoids storing the API key itself as plaintext in `localStorage`, but it is not equivalent to production-grade secret management. The encryption key is still stored in the same browser environment, so any script or attacker that can access the page's origin and `localStorage` may be able to decrypt the API key.
+
+This design is useful for reducing accidental exposure from simple `localStorage` inspection, but it does not protect against:
+
+- Cross-site scripting on the same origin
+- Malicious browser extensions
+- Compromised browsers
+- Users sharing the full URL, including the fragment
+- Screenshots or logs that include the URL
+- Other users with access to the same browser profile
+
+The URL fragment is not sent to the server as part of normal HTTP requests, but it can still be visible in the browser address bar and may be copied or shared by the user.
+
+For production use, do not expose API keys directly to frontend code. Use a backend proxy, server-side session, OAuth flow, or another server-side authentication mechanism.
 
 ## API Compatibility
 
@@ -105,19 +137,6 @@ It also includes a loose fallback for:
 choices[0].text
 ```
 
-## Security Notes
-
-This client stores the API endpoint and API key in the browser's `localStorage`.
-
-Do not use it on:
-
-* Shared computers
-* Public terminals
-* Untrusted browsers
-* Hosted pages that other users can access
-
-For production use, avoid exposing API keys directly in frontend code. Use a backend proxy or another server-side authentication flow instead.
-
 ## CORS Notes
 
 Because this client calls the API directly from the browser, the API server must allow cross-origin requests.
@@ -142,12 +161,12 @@ You can customize colors by editing the variables in the `:root` block and the `
 
 This is a minimal testing client. It does not provide:
 
-* Multi-turn conversation history
-* System prompt editing
-* File upload support
-* Tool/function calling support
-* Authentication flows beyond bearer tokens
-* Production-grade secret management
+- Multi-turn conversation history
+- System prompt editing
+- File upload support
+- Tool/function calling support
+- Authentication flows beyond bearer tokens
+- Production-grade secret management
 
 ## License
 
