@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenAI互換API Chat Client</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a2f;
+      --panel2: #17213a;
+      --text: #e7ecf7;
+      --muted: #a9b4c7;
+      --border: #2a3658;
+      --accent: #7aa2ff;
+      --danger: #ff6b7a;
+      --ok: #74d99f;
+      --warn: #ffd36b;
+      --shadow: 0 10px 30px rgba(0,0,0,.25);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #1e2f5c 0, var(--bg) 44%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    main {
+      width: min(1060px, calc(100vw - 32px));
+      margin: 32px auto;
+    }
+
+    h1 {
+      font-size: clamp(24px, 3vw, 34px);
+      margin: 0 0 8px;
+      letter-spacing: .02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 0 0 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      backdrop-filter: blur(10px);
+    }
+
+    .card + .card { margin-top: 18px; }
+
+    h2 {
+      font-size: 17px;
+      margin: 0 0 14px;
+    }
+
+    label {
+      display: block;
+      font-weight: 650;
+      margin: 14px 0 6px;
+      color: #f3f6fc;
+    }
+
+    input, select, textarea, button {
+      font: inherit;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      color: var(--text);
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(122,162,255,.18);
+    }
+
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .row > * { flex: 1; }
+
+    .btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      color: #07101f;
+      background: var(--accent);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      color: var(--text);
+      background: #253454;
+      border: 1px solid var(--border);
+    }
+
+    button.danger {
+      color: #29040a;
+      background: var(--danger);
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .hint, .status {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .status.err { color: var(--danger); }
+
+    .output {
+      min-height: 320px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #081026;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      overflow: auto;
+    }
+
+    .meta {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    code {
+      background: #07101f;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1px 5px;
+    }
+
+    details {
+      margin-top: 12px;
+      color: var(--muted);
+    }
+
+    summary {
+      cursor: pointer;
+      color: var(--text);
+      font-weight: 650;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OpenAI互換API Chat Client</h1>
+    <p class="subtitle">ブラウザから <code>/v1/models</code> と <code>/v1/chat/completions</code> に直接アクセスする最小構成クライアント。</p>
+
+    <div class="grid">
+      <section>
+        <div class="card">
+          <h2>1. API設定</h2>
+
+          <label for="baseUrl">エンドポイントURL</label>
+          <input id="baseUrl" type="url" placeholder="https://api.example.com または https://api.example.com/v1" autocomplete="off" />
+          <div class="hint">末尾が <code>/v1</code> でも、そうでなくても動作するよう正規化します。</div>
+
+          <label for="apiKey">APIキー</label>
+          <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+          <div class="hint">localStorageに保存されます。共有PCや公開端末では使用しないでください。</div>
+
+          <div class="btns">
+            <button id="saveSettingsBtn">設定を保存</button>
+            <button id="clearSettingsBtn" class="secondary">設定を削除</button>
+          </div>
+          <div id="settingsStatus" class="status"></div>
+        </div>
+
+        <div class="card">
+          <h2>2. モデル一覧</h2>
+
+          <label for="modelSelect">モデル</label>
+          <select id="modelSelect">
+            <option value="">モデル未取得</option>
+          </select>
+
+          <div class="btns">
+            <button id="loadModelsBtn">モデル一覧を取得</button>
+          </div>
+          <div id="modelsStatus" class="status"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>3. チャット送信</h2>
+
+        <label for="promptInput">プロンプト</label>
+        <textarea id="promptInput" placeholder="ここにプロンプトを入力"></textarea>
+
+        <details>
+          <summary>任意パラメータ</summary>
+          <div class="row">
+            <div>
+              <label for="temperature">temperature</label>
+              <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7" />
+            </div>
+            <div>
+              <label for="maxTokens">max_tokens</label>
+              <input id="maxTokens" type="number" min="1" step="1" placeholder="空なら未指定" />
+            </div>
+          </div>
+        </details>
+
+        <div class="btns">
+          <button id="sendBtn">送信</button>
+          <button id="stopBtn" class="danger" disabled>停止</button>
+          <button id="clearOutputBtn" class="secondary">出力をクリア</button>
+        </div>
+
+        <div id="chatStatus" class="status"></div>
+
+        <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
+
+        <div class="meta">
+          <span>リアルタイム応答</span>
+          <span id="tokenCounter">0 chars</span>
+        </div>
+        <div id="output" class="output" aria-live="polite"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
+
+    const el = {
+      baseUrl: document.getElementById("baseUrl"),
+      apiKey: document.getElementById("apiKey"),
+      saveSettingsBtn: document.getElementById("saveSettingsBtn"),
+      clearSettingsBtn: document.getElementById("clearSettingsBtn"),
+      settingsStatus: document.getElementById("settingsStatus"),
+      modelSelect: document.getElementById("modelSelect"),
+      loadModelsBtn: document.getElementById("loadModelsBtn"),
+      modelsStatus: document.getElementById("modelsStatus"),
+      promptInput: document.getElementById("promptInput"),
+      temperature: document.getElementById("temperature"),
+      maxTokens: document.getElementById("maxTokens"),
+      sendBtn: document.getElementById("sendBtn"),
+      stopBtn: document.getElementById("stopBtn"),
+      clearOutputBtn: document.getElementById("clearOutputBtn"),
+      chatStatus: document.getElementById("chatStatus"),
+      output: document.getElementById("output"),
+      tokenCounter: document.getElementById("tokenCounter"),
+    };
+
+    let abortController = null;
+
+    function setStatus(node, message, type = "") {
+      node.textContent = message;
+      node.className = `status ${type}`.trim();
+    }
+
+    function normalizeBaseUrl(raw) {
+      const value = raw.trim().replace(/\/+$/, "");
+      if (!value) throw new Error("エンドポイントURLを入力してください。");
+      try {
+        new URL(value);
+      } catch {
+        throw new Error("エンドポイントURLがURLとして不正です。");
+      }
+      return value.endsWith("/v1") ? value : `${value}/v1`;
+    }
+
+    function getSettings() {
+      const baseUrl = normalizeBaseUrl(el.baseUrl.value);
+      const apiKey = el.apiKey.value.trim();
+      return { baseUrl, apiKey };
+    }
+
+    function authHeaders(apiKey) {
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      return headers;
+    }
+
+    function saveSettings() {
+      try {
+        const settings = getSettings();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        setStatus(el.settingsStatus, "設定をlocalStorageに保存しました。", "ok");
+      } catch (error) {
+        setStatus(el.settingsStatus, error.message, "err");
+      }
+    }
+
+    function loadSettings() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      try {
+        const settings = JSON.parse(saved);
+        el.baseUrl.value = settings.baseUrl || "";
+        el.apiKey.value = settings.apiKey || "";
+        setStatus(el.settingsStatus, "保存済み設定を読み込みました。", "ok");
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+        setStatus(el.settingsStatus, "保存済み設定が壊れていたため削除しました。", "warn");
+      }
+    }
+
+    function clearSettings() {
+      localStorage.removeItem(STORAGE_KEY);
+      el.baseUrl.value = "";
+      el.apiKey.value = "";
+      el.modelSelect.innerHTML = '<option value="">モデル未取得</option>';
+      setStatus(el.settingsStatus, "保存済み設定を削除しました。", "ok");
+    }
+
+    async function loadModels() {
+      let settings;
+      try {
+        settings = getSettings();
+      } catch (error) {
+        setStatus(el.modelsStatus, error.message, "err");
+        return;
+      }
+
+      el.loadModelsBtn.disabled = true;
+      setStatus(el.modelsStatus, "モデル一覧を取得中...", "");
+
+      try {
+        const response = await fetch(`${settings.baseUrl}/models`, {
+          method: "GET",
+          headers: authHeaders(settings.apiKey),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          throw new Error(`モデル取得に失敗しました: HTTP ${response.status} ${errorText}`.trim());
+        }
+
+        const json = await response.json();
+        const models = Array.isArray(json.data)
+          ? json.data.map(item => item.id || item.name).filter(Boolean)
+          : [];
+
+        if (models.length === 0) {
+          throw new Error("レスポンス内にモデルIDが見つかりませんでした。");
+        }
+
+        models.sort((a, b) => a.localeCompare(b));
+        const previouslySelected = el.modelSelect.value;
+        el.modelSelect.innerHTML = models
+          .map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`)
+          .join("");
+
+        if (models.includes(previouslySelected)) {
+          el.modelSelect.value = previouslySelected;
+        }
+
+        setStatus(el.modelsStatus, `${models.length}件のモデルを取得しました。`, "ok");
+      } catch (error) {
+        setStatus(el.modelsStatus, error.message, "err");
+      } finally {
+        el.loadModelsBtn.disabled = false;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function appendOutput(text) {
+      el.output.textContent += text;
+      el.output.scrollTop = el.output.scrollHeight;
+      el.tokenCounter.textContent = `${el.output.textContent.length} chars`;
+    }
+
+    function clearOutput() {
+      el.output.textContent = "";
+      el.tokenCounter.textContent = "0 chars";
+      setStatus(el.chatStatus, "", "");
+    }
+
+    function buildChatBody() {
+      const model = el.modelSelect.value;
+      const prompt = el.promptInput.value.trim();
+      const temperatureRaw = el.temperature.value;
+      const maxTokensRaw = el.maxTokens.value;
+
+      if (!model) throw new Error("モデルを選択してください。");
+      if (!prompt) throw new Error("プロンプトを入力してください。");
+
+      const body = {
+        model,
+        messages: [
+          { role: "user", content: prompt }
+        ],
+        stream: true,
+      };
+
+      if (temperatureRaw !== "") {
+        const temperature = Number(temperatureRaw);
+        if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
+          throw new Error("temperatureは0〜2の数値にしてください。");
+        }
+        body.temperature = temperature;
+      }
+
+      if (maxTokensRaw !== "") {
+        const maxTokens = Number(maxTokensRaw);
+        if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
+          throw new Error("max_tokensは1以上の整数にしてください。");
+        }
+        body.max_tokens = maxTokens;
+      }
+
+      return body;
+    }
+
+    async function sendChatCompletion() {
+      let settings;
+      let body;
+
+      try {
+        settings = getSettings();
+        body = buildChatBody();
+      } catch (error) {
+        setStatus(el.chatStatus, error.message, "err");
+        return;
+      }
+
+      abortController = new AbortController();
+      el.sendBtn.disabled = true;
+      el.stopBtn.disabled = false;
+      setStatus(el.chatStatus, "送信中...", "");
+      clearOutput();
+
+      try {
+        const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: authHeaders(settings.apiKey),
+          body: JSON.stringify(body),
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          throw new Error(`チャット送信に失敗しました: HTTP ${response.status} ${errorText}`.trim());
+        }
+
+        if (!response.body) {
+          throw new Error("ReadableStreamに対応していないレスポンスです。");
+        }
+
+        setStatus(el.chatStatus, "ストリーミング受信中...", "");
+        await readSseStream(response.body);
+        setStatus(el.chatStatus, "完了しました。", "ok");
+      } catch (error) {
+        if (error.name === "AbortError") {
+          setStatus(el.chatStatus, "停止しました。", "warn");
+        } else {
+          setStatus(el.chatStatus, error.message, "err");
+        }
+      } finally {
+        abortController = null;
+        el.sendBtn.disabled = false;
+        el.stopBtn.disabled = true;
+      }
+    }
+
+    async function readSseStream(stream) {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() || "";
+
+        for (const eventText of events) {
+          handleSseEvent(eventText);
+        }
+      }
+
+      buffer += decoder.decode();
+      if (buffer.trim()) handleSseEvent(buffer);
+    }
+
+    function handleSseEvent(eventText) {
+      const dataLines = eventText
+        .split(/\r?\n/)
+        .filter(line => line.startsWith("data:"))
+        .map(line => line.slice(5).trimStart());
+
+      if (dataLines.length === 0) return;
+
+      const data = dataLines.join("\n").trim();
+      if (!data || data === "[DONE]") return;
+
+      try {
+        const json = JSON.parse(data);
+        const choice = json.choices?.[0];
+        const delta = choice?.delta;
+
+        // OpenAI互換の多くは delta.content。実装差異に備えて text も見る。
+        const text = delta?.content ?? choice?.text ?? "";
+        if (text) appendOutput(text);
+      } catch (error) {
+        // JSONではないSSEデータを返す互換APIへの緩いフォールバック。
+        appendOutput(data);
+      }
+    }
+
+    function stopStreaming() {
+      if (abortController) abortController.abort();
+    }
+
+    el.saveSettingsBtn.addEventListener("click", saveSettings);
+    el.clearSettingsBtn.addEventListener("click", clearSettings);
+    el.loadModelsBtn.addEventListener("click", loadModels);
+    el.sendBtn.addEventListener("click", sendChatCompletion);
+    el.stopBtn.addEventListener("click", stopStreaming);
+    el.clearOutputBtn.addEventListener("click", clearOutput);
+
+    loadSettings();
+  </script>
+</body>
+</html>
