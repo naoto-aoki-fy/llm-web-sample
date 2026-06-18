@@ -6,18 +6,52 @@
   <title>OpenAI-Compatible API Chat Client</title>
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #121a2f;
-      --panel2: #17213a;
-      --text: #e7ecf7;
-      --muted: #a9b4c7;
-      --border: #2a3658;
-      --accent: #7aa2ff;
-      --danger: #ff6b7a;
-      --ok: #74d99f;
-      --warn: #ffd36b;
-      --shadow: 0 10px 30px rgba(0,0,0,.25);
+      color-scheme: light dark;
+
+      --bg: #f6f8fc;
+      --bg-glow: #dfe8ff;
+      --panel: #ffffff;
+      --panel2: #f1f4fa;
+      --text: #172033;
+      --muted: #5c6980;
+      --label: #101828;
+      --border: #cad3e3;
+      --accent: #3f6fe5;
+      --accent-text: #ffffff;
+      --secondary-button-bg: #eef2f8;
+      --danger: #d9354a;
+      --danger-text: #ffffff;
+      --ok: #16884c;
+      --warn: #9a6a00;
+      --output-bg: #ffffff;
+      --code-bg: #eef2f8;
+      --focus-ring: rgba(63,111,229,.22);
+      --shadow: 0 10px 30px rgba(25,42,70,.12);
       --radius: 14px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1020;
+        --bg-glow: #1e2f5c;
+        --panel: #121a2f;
+        --panel2: #17213a;
+        --text: #e7ecf7;
+        --muted: #a9b4c7;
+        --label: #f3f6fc;
+        --border: #2a3658;
+        --accent: #7aa2ff;
+        --accent-text: #07101f;
+        --secondary-button-bg: #253454;
+        --danger: #ff6b7a;
+        --danger-text: #29040a;
+        --ok: #74d99f;
+        --warn: #ffd36b;
+        --output-bg: #081026;
+        --code-bg: #07101f;
+        --focus-ring: rgba(122,162,255,.18);
+        --shadow: 0 10px 30px rgba(0,0,0,.25);
+      }
     }
 
     * { box-sizing: border-box; }
@@ -25,7 +59,7 @@
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top left, #1e2f5c 0, var(--bg) 44%);
+      background: radial-gradient(circle at top left, var(--bg-glow) 0, var(--bg) 44%);
       color: var(--text);
       line-height: 1.6;
     }
@@ -77,7 +111,7 @@
       display: block;
       font-weight: 650;
       margin: 14px 0 6px;
-      color: #f3f6fc;
+      color: var(--label);
     }
 
     input, select, textarea, button {
@@ -96,7 +130,7 @@
 
     input:focus, select:focus, textarea:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(122,162,255,.18);
+      box-shadow: 0 0 0 3px var(--focus-ring);
     }
 
     textarea {
@@ -124,7 +158,7 @@
       border: 0;
       border-radius: 999px;
       padding: 10px 16px;
-      color: #07101f;
+      color: var(--accent-text);
       background: var(--accent);
       cursor: pointer;
       font-weight: 700;
@@ -132,12 +166,12 @@
 
     button.secondary {
       color: var(--text);
-      background: #253454;
+      background: var(--secondary-button-bg);
       border: 1px solid var(--border);
     }
 
     button.danger {
-      color: #29040a;
+      color: var(--danger-text);
       background: var(--danger);
     }
 
@@ -160,7 +194,7 @@
       min-height: 320px;
       white-space: pre-wrap;
       word-break: break-word;
-      background: #081026;
+      background: var(--output-bg);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
@@ -178,7 +212,7 @@
     }
 
     code {
-      background: #07101f;
+      background: var(--code-bg);
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 1px 5px;
