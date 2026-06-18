@@ -246,7 +246,7 @@
 
           <label for="apiKey">API Key</label>
           <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
-          <div class="hint">This is stored in localStorage. Do not use this on shared computers or public terminals.</div>
+          <div class="hint">The API key is encrypted with a locally stored random secret and saved in the URL fragment, not in localStorage.</div>
 
           <div class="btns">
             <button id="saveSettingsBtn">Save Settings</button>
@@ -310,7 +310,9 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
+    const SETTINGS_STORAGE_KEY = "openai-compatible-chat-client-settings:v2";
+    const LEGACY_STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
+    const SECRET_KEY_STORAGE_KEY = "openai-compatible-chat-client-secret-key:v1";
 
     const el = {
       baseUrl: document.getElementById("baseUrl"),
@@ -362,36 +364,215 @@
       return headers;
     }
 
-    function saveSettings() {
+    function ensureCryptoAvailable() {
+      if (!window.crypto?.getRandomValues || !window.crypto?.subtle) {
+        throw new Error("Web Crypto API is not available in this browser or context.");
+      }
+    }
+
+    function bytesToBase64Url(bytes) {
+      let binary = "";
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+
+      return btoa(binary)
+        .replaceAll("+", "-")
+        .replaceAll("/", "_")
+        .replace(/=+$/, "");
+    }
+
+    function base64UrlToBytes(value) {
+      const base64 = value
+        .replaceAll("-", "+")
+        .replaceAll("_", "/")
+        .padEnd(Math.ceil(value.length / 4) * 4, "=");
+
+      const binary = atob(base64);
+      return Uint8Array.from(binary, char => char.charCodeAt(0));
+    }
+
+    function getOrCreateRawSecretKey() {
+      ensureCryptoAvailable();
+
+      const saved = localStorage.getItem(SECRET_KEY_STORAGE_KEY);
+      if (saved) {
+        try {
+          const keyBytes = base64UrlToBytes(saved);
+          if (keyBytes.length === 32) return keyBytes;
+        } catch {
+          // Fall through and replace the invalid saved key.
+        }
+      }
+
+      const keyBytes = new Uint8Array(32);
+      crypto.getRandomValues(keyBytes);
+      localStorage.setItem(SECRET_KEY_STORAGE_KEY, bytesToBase64Url(keyBytes));
+      return keyBytes;
+    }
+
+    async function getOrCreateCryptoKey(usages) {
+      const keyBytes = getOrCreateRawSecretKey();
+      return crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: "AES-GCM" },
+        false,
+        usages
+      );
+    }
+
+    async function encryptApiKey(apiKey) {
+      const key = await getOrCreateCryptoKey(["encrypt"]);
+      const iv = new Uint8Array(12);
+      crypto.getRandomValues(iv);
+
+      const encoded = new TextEncoder().encode(apiKey);
+      const encrypted = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        encoded
+      );
+
+      return `${bytesToBase64Url(iv)}.${bytesToBase64Url(new Uint8Array(encrypted))}`;
+    }
+
+    async function decryptApiKey(encryptedValue) {
+      const [ivPart, encryptedPart] = encryptedValue.split(".");
+      if (!ivPart || !encryptedPart) {
+        throw new Error("The encrypted API key format is invalid.");
+      }
+
+      const key = await getOrCreateCryptoKey(["decrypt"]);
+      const iv = base64UrlToBytes(ivPart);
+      const encryptedBytes = base64UrlToBytes(encryptedPart);
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        encryptedBytes
+      );
+
+      return new TextDecoder().decode(decrypted);
+    }
+
+    function getEncryptedApiKeyFromUrl() {
+      const rawHash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+
+      const params = new URLSearchParams(rawHash);
+      return params.get("key") || "";
+    }
+
+    function replaceEncryptedApiKeyInUrl(encryptedValue) {
+      const url = new URL(window.location.href);
+      const rawHash = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
+      const params = new URLSearchParams(rawHash);
+
+      if (encryptedValue) {
+        params.set("key", encryptedValue);
+      } else {
+        params.delete("key");
+      }
+
+      const nextHash = params.toString();
+      url.hash = nextHash ? `?${nextHash}` : "";
+      window.location.replace(url.toString());
+    }
+
+    function saveBaseUrlOnly(baseUrl) {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ baseUrl }));
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
+
+    async function saveSettings() {
       try {
         const settings = getSettings();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        setStatus(el.settingsStatus, "Settings saved to localStorage.", "ok");
+
+        // Ensure a random local secret exists, but never save the API key itself to localStorage.
+        getOrCreateRawSecretKey();
+        saveBaseUrlOnly(settings.baseUrl);
+
+        if (settings.apiKey) {
+          const encryptedApiKey = await encryptApiKey(settings.apiKey);
+          replaceEncryptedApiKeyInUrl(encryptedApiKey);
+          setStatus(el.settingsStatus, "Settings saved. The API key was encrypted into the URL fragment.", "ok");
+        } else {
+          replaceEncryptedApiKeyInUrl("");
+          setStatus(el.settingsStatus, "Settings saved. No API key is stored.", "ok");
+        }
       } catch (error) {
         setStatus(el.settingsStatus, error.message, "err");
       }
     }
 
-    function loadSettings() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-      try {
-        const settings = JSON.parse(saved);
-        el.baseUrl.value = settings.baseUrl || "";
-        el.apiKey.value = settings.apiKey || "";
-        setStatus(el.settingsStatus, "Saved settings loaded.", "ok");
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-        setStatus(el.settingsStatus, "Saved settings were corrupted and have been removed.", "warn");
+    async function loadSettings() {
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY)
+        || localStorage.getItem(LEGACY_STORAGE_KEY);
+
+      let loadedBaseUrl = false;
+      let legacyApiKey = "";
+
+      if (saved) {
+        try {
+          const settings = JSON.parse(saved);
+          el.baseUrl.value = settings.baseUrl || "";
+          loadedBaseUrl = Boolean(settings.baseUrl);
+
+          if (settings.apiKey) {
+            legacyApiKey = String(settings.apiKey).trim();
+          }
+
+          saveBaseUrlOnly(settings.baseUrl || "");
+        } catch {
+          localStorage.removeItem(SETTINGS_STORAGE_KEY);
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+          setStatus(el.settingsStatus, "Saved settings were corrupted and have been removed.", "warn");
+          return;
+        }
+      }
+
+      const encryptedApiKey = getEncryptedApiKeyFromUrl();
+      if (encryptedApiKey) {
+        try {
+          el.apiKey.value = await decryptApiKey(encryptedApiKey);
+          setStatus(el.settingsStatus, "Saved settings loaded. The API key was decrypted from the URL fragment.", "ok");
+          return;
+        } catch (error) {
+          setStatus(el.settingsStatus, `Could not decrypt the API key from the URL fragment: ${error.message}`, "err");
+          return;
+        }
+      }
+
+      if (legacyApiKey) {
+        try {
+          getOrCreateRawSecretKey();
+          el.apiKey.value = legacyApiKey;
+          const encryptedLegacyApiKey = await encryptApiKey(legacyApiKey);
+          replaceEncryptedApiKeyInUrl(encryptedLegacyApiKey);
+          setStatus(el.settingsStatus, "A legacy API key was removed from localStorage and encrypted into the URL fragment.", "ok");
+          return;
+        } catch (error) {
+          setStatus(el.settingsStatus, `A legacy API key was removed from localStorage, but could not be encrypted: ${error.message}`, "err");
+          return;
+        }
+      }
+
+      if (loadedBaseUrl) {
+        setStatus(el.settingsStatus, "Saved endpoint URL loaded.", "ok");
       }
     }
 
     function clearSettings() {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SETTINGS_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      localStorage.removeItem(SECRET_KEY_STORAGE_KEY);
       el.baseUrl.value = "";
       el.apiKey.value = "";
       el.modelSelect.innerHTML = '<option value="">No models loaded</option>';
-      setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
+      replaceEncryptedApiKeyInUrl("");
+      setStatus(el.settingsStatus, "Saved settings, local secret, and encrypted URL key cleared.", "ok");
     }
 
     async function loadModels() {
@@ -603,14 +784,16 @@
       if (abortController) abortController.abort();
     }
 
-    el.saveSettingsBtn.addEventListener("click", saveSettings);
+    el.saveSettingsBtn.addEventListener("click", () => {
+      void saveSettings();
+    });
     el.clearSettingsBtn.addEventListener("click", clearSettings);
     el.loadModelsBtn.addEventListener("click", loadModels);
     el.sendBtn.addEventListener("click", sendChatCompletion);
     el.stopBtn.addEventListener("click", stopStreaming);
     el.clearOutputBtn.addEventListener("click", clearOutput);
 
-    loadSettings();
+    void loadSettings();
   </script>
 </body>
 </html>
