@@ -288,6 +288,16 @@
               <input id="maxTokens" type="number" min="1" step="1" placeholder="Leave blank to omit" />
             </div>
           </div>
+
+          <label for="additionalParameters">Additional request parameters (JSON)</label>
+          <textarea id="additionalParameters" spellcheck="false" placeholder='{"thinking":{"type":"disabled"}}'></textarea>
+          <div class="hint">
+            Enter a JSON object of provider-specific settings, for example
+            <code>{"thinking":{"type":"disabled"}}</code>. These settings are passed through to the server
+            unchanged, and the destination provider may reject unsupported fields. The keys
+            <code>model</code>, <code>messages</code>, <code>stream</code>, <code>temperature</code>, and
+            <code>max_tokens</code> are reserved; use the dedicated fields above where available.
+          </div>
         </details>
 
         <div class="btns">
@@ -324,6 +334,7 @@
       promptInput: document.getElementById("promptInput"),
       temperature: document.getElementById("temperature"),
       maxTokens: document.getElementById("maxTokens"),
+      additionalParameters: document.getElementById("additionalParameters"),
       sendBtn: document.getElementById("sendBtn"),
       stopBtn: document.getElementById("stopBtn"),
       clearOutputBtn: document.getElementById("clearOutputBtn"),
@@ -470,11 +481,12 @@
       const prompt = el.promptInput.value.trim();
       const temperatureRaw = el.temperature.value;
       const maxTokensRaw = el.maxTokens.value;
+      const additionalParametersRaw = el.additionalParameters.value.trim();
 
       if (!model) throw new Error("Select a model.");
       if (!prompt) throw new Error("Enter a prompt.");
 
-      const body = {
+      let body = {
         model,
         messages: [
           { role: "user", content: prompt }
@@ -496,6 +508,30 @@
           throw new Error("max_tokens must be an integer of 1 or greater.");
         }
         body.max_tokens = maxTokens;
+      }
+
+      if (additionalParametersRaw) {
+        let additionalParameters;
+        try {
+          additionalParameters = JSON.parse(additionalParametersRaw);
+        } catch (error) {
+          throw new Error(`Additional request parameters contain a JSON syntax error: ${error.message}`);
+        }
+
+        if (additionalParameters === null || Array.isArray(additionalParameters) || typeof additionalParameters !== "object") {
+          throw new Error("Additional request parameters must be a JSON object, not an array, null, or primitive value.");
+        }
+
+        const reservedKeys = ["model", "messages", "stream", "temperature", "max_tokens"];
+        const conflictingKeys = reservedKeys.filter(key => Object.hasOwn(additionalParameters, key));
+        if (conflictingKeys.length > 0) {
+          throw new Error(
+            `Additional request parameters cannot include reserved ${conflictingKeys.length === 1 ? "key" : "keys"}: ${conflictingKeys.join(", ")}. ` +
+            "Use the dedicated fields for temperature and max_tokens."
+          );
+        }
+
+        body = { ...body, ...additionalParameters };
       }
 
       return body;
