@@ -276,6 +276,12 @@
       <section class="card">
         <h2>3. Send Chat Request</h2>
 
+        <label for="systemPromptInput">System Prompt</label>
+        <textarea id="systemPromptInput" name="systemPromptInput" placeholder="Optionally describe how the assistant should respond"></textarea>
+        <div class="hint">
+          Leave blank to send no system message. This chat input is kept only for this page session and is not saved by <strong>Save Settings</strong>.
+        </div>
+
         <label for="promptInput">Prompt</label>
         <textarea id="promptInput" placeholder="Enter your prompt here"></textarea>
 
@@ -340,6 +346,7 @@
       modelSelect: document.getElementById("modelSelect"),
       loadModelsBtn: document.getElementById("loadModelsBtn"),
       modelsStatus: document.getElementById("modelsStatus"),
+      systemPromptInput: document.getElementById("systemPromptInput"),
       promptInput: document.getElementById("promptInput"),
       temperature: document.getElementById("temperature"),
       maxTokens: document.getElementById("maxTokens"),
@@ -497,6 +504,7 @@
 
     function buildChatBody() {
       const model = el.modelSelect.value;
+      const systemPrompt = el.systemPromptInput.value;
       const prompt = el.promptInput.value.trim();
       const temperatureRaw = el.temperature.value;
       const maxTokensRaw = el.maxTokens.value;
@@ -505,11 +513,16 @@
       if (!model) throw new Error("Select a model.");
       if (!prompt) throw new Error("Enter a prompt.");
 
+      const messages = [];
+      // Preserve intentional whitespace in the system prompt; trim only to test whether it is blank.
+      if (systemPrompt.trim()) {
+        messages.push({ role: "system", content: systemPrompt });
+      }
+      messages.push({ role: "user", content: prompt });
+
       let body = {
         model,
-        messages: [
-          { role: "user", content: prompt }
-        ],
+        messages,
         stream: true,
       };
 
