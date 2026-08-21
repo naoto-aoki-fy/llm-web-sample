@@ -201,6 +201,13 @@
       overflow: auto;
     }
 
+    .thinking {
+      min-height: 96px;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
     .meta {
       display: flex;
       gap: 12px;
@@ -311,6 +318,12 @@
         <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
         <div class="meta">
+          <span>Live Thinking</span>
+          <span id="thinkingCounter">0 chars</span>
+        </div>
+        <div id="thinkingOutput" class="output thinking" aria-live="polite"></div>
+
+        <div class="meta">
           <span>Live Response</span>
           <span id="tokenCounter">0 chars</span>
         </div>
@@ -339,6 +352,8 @@
       stopBtn: document.getElementById("stopBtn"),
       clearOutputBtn: document.getElementById("clearOutputBtn"),
       chatStatus: document.getElementById("chatStatus"),
+      thinkingOutput: document.getElementById("thinkingOutput"),
+      thinkingCounter: document.getElementById("thinkingCounter"),
       output: document.getElementById("output"),
       tokenCounter: document.getElementById("tokenCounter"),
     };
@@ -470,7 +485,15 @@
       el.tokenCounter.textContent = `${el.output.textContent.length} chars`;
     }
 
+    function appendThinking(text) {
+      el.thinkingOutput.textContent += text;
+      el.thinkingOutput.scrollTop = el.thinkingOutput.scrollHeight;
+      el.thinkingCounter.textContent = `${el.thinkingOutput.textContent.length} chars`;
+    }
+
     function clearOutput() {
+      el.thinkingOutput.textContent = "";
+      el.thinkingCounter.textContent = "0 chars";
       el.output.textContent = "";
       el.tokenCounter.textContent = "0 chars";
       setStatus(el.chatStatus, "", "");
@@ -625,6 +648,10 @@
         const json = JSON.parse(data);
         const choice = json.choices?.[0];
         const delta = choice?.delta;
+
+        // Providers commonly stream reasoning separately under one of these fields.
+        const thinking = delta?.reasoning_content ?? delta?.reasoning ?? choice?.reasoning_content ?? "";
+        if (thinking) appendThinking(typeof thinking === "string" ? thinking : JSON.stringify(thinking));
 
         // Most OpenAI-compatible APIs use delta.content. Check text as a fallback for implementation differences.
         const text = delta?.content ?? choice?.text ?? "";

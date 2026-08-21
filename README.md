@@ -16,6 +16,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * No external JavaScript dependencies
 * Model list loading from `/v1/models`
 * Streaming chat response support via Server-Sent Events style responses
+* Separate live display for streamed model thinking/reasoning
 * Optional `temperature` and `max_tokens` parameters
 * Arbitrary provider-specific request parameters supplied as a JSON object
 * API settings saved in `localStorage`
@@ -140,6 +141,12 @@ It also includes a loose fallback for:
 ```js
 choices[0].text
 ```
+
+When a compatible provider exposes its reasoning, the client displays it separately
+from the final response. It recognizes the commonly used streaming fields
+`choices[0].delta.reasoning_content` and `choices[0].delta.reasoning`, plus
+`choices[0].reasoning_content` as a fallback. Providers that do not return one of
+these fields simply leave the **Live Thinking** panel empty.
 
 ## Security Notes
 
