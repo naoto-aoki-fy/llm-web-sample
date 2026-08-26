@@ -229,6 +229,17 @@
       font-size: 13px;
     }
 
+    .meta-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .copy-button {
+      padding: 5px 11px;
+      font-size: 12px;
+    }
+
     code {
       background: var(--code-bg);
       border: 1px solid var(--border);
@@ -368,7 +379,10 @@
 
         <div class="meta">
           <span>Live Response</span>
-          <span id="tokenCounter">0 chars</span>
+          <span class="meta-actions">
+            <span id="tokenCounter">0 chars</span>
+            <button id="copyOutputBtn" type="button" class="secondary copy-button" disabled>Copy</button>
+          </span>
         </div>
         <div id="output" class="output" aria-live="polite"></div>
       </section>
@@ -403,6 +417,7 @@
       sendBtn: document.getElementById("sendBtn"),
       stopBtn: document.getElementById("stopBtn"),
       clearOutputBtn: document.getElementById("clearOutputBtn"),
+      copyOutputBtn: document.getElementById("copyOutputBtn"),
       chatStatus: document.getElementById("chatStatus"),
       thinkingOutput: document.getElementById("thinkingOutput"),
       thinkingCounter: document.getElementById("thinkingCounter"),
@@ -637,6 +652,8 @@
       el.output.textContent += text;
       el.output.scrollTop = el.output.scrollHeight;
       el.tokenCounter.textContent = `${el.output.textContent.length} chars`;
+      el.copyOutputBtn.disabled = !el.output.textContent;
+      el.copyOutputBtn.textContent = "Copy";
     }
 
     function appendThinking(text) {
@@ -650,7 +667,35 @@
       el.thinkingCounter.textContent = "0 chars";
       el.output.textContent = "";
       el.tokenCounter.textContent = "0 chars";
+      el.copyOutputBtn.disabled = true;
+      el.copyOutputBtn.textContent = "Copy";
       setStatus(el.chatStatus, "", "");
+    }
+
+    async function copyOutput() {
+      const text = el.output.textContent;
+      if (!text) return;
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          const copied = document.execCommand("copy");
+          textarea.remove();
+          if (!copied) throw new Error("The browser rejected the copy command.");
+        }
+        el.copyOutputBtn.textContent = "Copied!";
+        setStatus(el.chatStatus, "Response copied to the clipboard.", "ok");
+      } catch {
+        el.copyOutputBtn.textContent = "Copy failed";
+        setStatus(el.chatStatus, "Could not copy the response. Check your browser's clipboard permission.", "err");
+      }
     }
 
     function buildChatBody() {
@@ -847,6 +892,7 @@
     el.sendBtn.addEventListener("click", sendChatCompletion);
     el.stopBtn.addEventListener("click", stopStreaming);
     el.clearOutputBtn.addEventListener("click", clearOutput);
+    el.copyOutputBtn.addEventListener("click", copyOutput);
 
     loadSettings();
     loadPreferences();

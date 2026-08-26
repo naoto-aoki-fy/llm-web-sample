@@ -16,6 +16,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * No external JavaScript dependencies
 * Model list loading from `/v1/models`
 * Streaming chat response support via Server-Sent Events style responses
+* One-click copying of the LLM response to the clipboard
 * Separate live display for streamed model thinking/reasoning
 * Named system prompt saving and recall through `localStorage`
 * Optional combined-prompt format for models without system-message support
@@ -107,6 +108,9 @@ The target API server must support browser access, including appropriate CORS he
    This JSON text is saved as you edit it and restored on the next visit.
 
 10. Click **Send**.
+
+11. Click **Copy** beside **Live Response** to copy the complete LLM response to the
+    clipboard. The button becomes available as soon as response text is received.
 
 The additional parameters input must contain a JSON object. Its fields are passed
 through to the destination server unchanged. Support varies between OpenAI-compatible
