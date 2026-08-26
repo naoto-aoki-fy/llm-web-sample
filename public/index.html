@@ -311,8 +311,8 @@
 
     <nav class="mode-switcher" aria-label="Application mode" role="tablist">
       <button id="chatModeBtn" class="mode-button" type="button" role="tab" aria-selected="true" aria-controls="chatMode">Chat</button>
-      <button id="configModeBtn" class="mode-button" type="button" role="tab" aria-selected="false" aria-controls="configMode">Config</button>
       <button id="historyModeBtn" class="mode-button" type="button" role="tab" aria-selected="false" aria-controls="historyMode">History</button>
+      <button id="configModeBtn" class="mode-button" type="button" role="tab" aria-selected="false" aria-controls="configMode">Config</button>
     </nav>
 
     <div class="grid">
@@ -347,6 +347,31 @@
             <button id="loadModelsBtn">Load Models</button>
           </div>
           <div id="modelsStatus" class="status"></div>
+        </div>
+
+        <div class="card">
+          <h2>Optional Parameters</h2>
+
+          <div class="row">
+            <div>
+              <label for="temperature">temperature</label>
+              <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7" />
+            </div>
+            <div>
+              <label for="maxTokens">max_tokens</label>
+              <input id="maxTokens" type="number" min="1" step="1" placeholder="Leave blank to omit" />
+            </div>
+          </div>
+
+          <label for="additionalParameters">Additional request parameters (JSON)</label>
+          <textarea id="additionalParameters" spellcheck="false" placeholder='{"reasoning_effort": "none"}'></textarea>
+          <div class="hint">
+            Enter a JSON object of provider-specific settings, for example
+            <code>{"reasoning_effort": "none"}</code>. These settings are passed through to the server
+            unchanged, and the destination provider may reject unsupported fields. The keys
+            <code>model</code>, <code>messages</code>, <code>stream</code>, <code>temperature</code>, and
+            <code>max_tokens</code> are reserved; use the dedicated fields above where available.
+          </div>
         </div>
 
         <div class="card">
@@ -391,30 +416,6 @@
 
         <label for="promptInput">Prompt</label>
         <textarea id="promptInput" placeholder="Enter your prompt here"></textarea>
-
-        <details>
-          <summary>Optional Parameters</summary>
-          <div class="row">
-            <div>
-              <label for="temperature">temperature</label>
-              <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7" />
-            </div>
-            <div>
-              <label for="maxTokens">max_tokens</label>
-              <input id="maxTokens" type="number" min="1" step="1" placeholder="Leave blank to omit" />
-            </div>
-          </div>
-
-          <label for="additionalParameters">Additional request parameters (JSON)</label>
-          <textarea id="additionalParameters" spellcheck="false" placeholder='{"reasoning_effort": "none"}'></textarea>
-          <div class="hint">
-            Enter a JSON object of provider-specific settings, for example
-            <code>{"reasoning_effort": "none"}</code>. These settings are passed through to the server
-            unchanged, and the destination provider may reject unsupported fields. The keys
-            <code>model</code>, <code>messages</code>, <code>stream</code>, <code>temperature</code>, and
-            <code>max_tokens</code> are reserved; use the dedicated fields above where available.
-          </div>
-        </details>
 
         <div class="btns">
           <button id="sendBtn">Send</button>

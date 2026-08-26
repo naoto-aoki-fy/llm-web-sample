@@ -14,7 +14,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * Single HTML file
 * No build step
 * No external JavaScript dependencies
-* Chat, configuration, and history modes that keep each workflow focused
+* Chat, history, and configuration modes that keep each workflow focused
 * Model list loading from `/v1/models`
 * Automatic model loading after endpoint and API key configuration, including on return visits
 * Streaming chat response support via Server-Sent Events style responses
@@ -97,11 +97,7 @@ The target API server must support browser access, including appropriate CORS he
 
    This checkbox is also recalled on the next visit.
 
-7. Select **Chat** and enter a user prompt. Leading and trailing whitespace in the user prompt is removed
-   before it is sent. For a nonblank system prompt, whitespace is used only to decide
-   whether the field is blank; the original system prompt text is sent unchanged.
-
-8. Optionally expand **Optional Parameters** and enter provider-specific settings in
+7. In **Config**, optionally set **Optional Parameters** and enter provider-specific settings in
    **Additional request parameters (JSON)**. For example:
 
    ```json
@@ -111,6 +107,10 @@ The target API server must support browser access, including appropriate CORS he
    ```
 
    This JSON text is saved as you edit it and restored on the next visit.
+
+8. Select **Chat** and enter a user prompt. Leading and trailing whitespace in the user prompt is removed
+   before it is sent. For a nonblank system prompt, whitespace is used only to decide
+   whether the field is blank; the original system prompt text is sent unchanged.
 
 9. Click **Send**.
 
