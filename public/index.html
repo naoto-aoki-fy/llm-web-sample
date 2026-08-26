@@ -240,6 +240,25 @@
       font-size: 12px;
     }
 
+    .history-detail {
+      display: grid;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .history-detail[hidden] { display: none; }
+
+    .history-block h3 {
+      font-size: 14px;
+      margin: 0 0 6px;
+      color: var(--muted);
+    }
+
+    .history-content {
+      min-height: 96px;
+      max-height: 280px;
+    }
+
     code {
       background: var(--code-bg);
       border: 1px solid var(--border);
@@ -386,6 +405,34 @@
         </div>
         <div id="output" class="output" aria-live="polite"></div>
       </section>
+
+      <section class="card">
+        <h2>4. Chat History</h2>
+        <div class="hint">Completed and stopped chats are stored in this browser. Select one to review the user input and LLM output.</div>
+
+        <label for="historySelect">Saved Chats</label>
+        <select id="historySelect">
+          <option value="">No saved chats</option>
+        </select>
+
+        <div class="btns">
+          <button id="deleteHistoryBtn" type="button" class="secondary" disabled>Delete Selected</button>
+          <button id="clearHistoryBtn" type="button" class="danger" disabled>Clear History</button>
+        </div>
+        <div id="historyStatus" class="status"></div>
+
+        <div id="historyDetail" class="history-detail" hidden>
+          <div id="historyMeta" class="hint"></div>
+          <div class="history-block">
+            <h3>User Input</h3>
+            <div id="historyPrompt" class="output history-content"></div>
+          </div>
+          <div class="history-block">
+            <h3>LLM Output</h3>
+            <div id="historyOutput" class="output history-content"></div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
@@ -393,6 +440,8 @@
     const STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
     const PREFERENCES_STORAGE_KEY = "openai-compatible-chat-client-preferences:v1";
     const SYSTEM_PROMPTS_STORAGE_KEY = "openai-compatible-chat-client-system-prompts:v1";
+    const CHAT_HISTORY_STORAGE_KEY = "openai-compatible-chat-client-history:v1";
+    const MAX_HISTORY_ITEMS = 100;
 
     const el = {
       baseUrl: document.getElementById("baseUrl"),
@@ -423,11 +472,20 @@
       thinkingCounter: document.getElementById("thinkingCounter"),
       output: document.getElementById("output"),
       tokenCounter: document.getElementById("tokenCounter"),
+      historySelect: document.getElementById("historySelect"),
+      deleteHistoryBtn: document.getElementById("deleteHistoryBtn"),
+      clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+      historyStatus: document.getElementById("historyStatus"),
+      historyDetail: document.getElementById("historyDetail"),
+      historyMeta: document.getElementById("historyMeta"),
+      historyPrompt: document.getElementById("historyPrompt"),
+      historyOutput: document.getElementById("historyOutput"),
     };
 
     let abortController = null;
     let savedModel = "";
     let savedSystemPrompts = [];
+    let chatHistory = [];
 
     function setStatus(node, message, type = "") {
       node.textContent = message;
@@ -672,6 +730,88 @@
       setStatus(el.chatStatus, "", "");
     }
 
+    function loadChatHistory() {
+      const saved = localStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          chatHistory = Array.isArray(parsed)
+            ? parsed.filter(item => item && typeof item.id === "string" && typeof item.prompt === "string" && typeof item.output === "string")
+            : [];
+        } catch {
+          localStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
+          setStatus(el.historyStatus, "Saved chat history was corrupted and has been removed.", "warn");
+        }
+      }
+      renderChatHistory();
+    }
+
+    function formatHistoryLabel(item) {
+      const date = new Date(item.createdAt);
+      const timestamp = Number.isNaN(date.getTime()) ? "Unknown date" : date.toLocaleString();
+      const summary = item.prompt.replace(/\s+/g, " ").trim().slice(0, 60) || "(empty prompt)";
+      return `${timestamp} — ${summary}`;
+    }
+
+    function renderChatHistory(selectedId = "") {
+      el.historySelect.innerHTML = chatHistory.length
+        ? '<option value="">Select a saved chat</option>' + chatHistory
+          .map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(formatHistoryLabel(item))}</option>`)
+          .join("")
+        : '<option value="">No saved chats</option>';
+
+      if (selectedId && chatHistory.some(item => item.id === selectedId)) {
+        el.historySelect.value = selectedId;
+      }
+      showSelectedHistory();
+      el.clearHistoryBtn.disabled = chatHistory.length === 0;
+    }
+
+    function showSelectedHistory() {
+      const selected = chatHistory.find(item => item.id === el.historySelect.value);
+      el.deleteHistoryBtn.disabled = !selected;
+      el.historyDetail.hidden = !selected;
+      if (!selected) return;
+
+      const date = new Date(selected.createdAt);
+      const timestamp = Number.isNaN(date.getTime()) ? "Unknown date" : date.toLocaleString();
+      el.historyMeta.textContent = `${timestamp} · Model: ${selected.model || "Unknown"}${selected.stopped ? " · Stopped" : ""}`;
+      el.historyPrompt.textContent = selected.prompt;
+      el.historyOutput.textContent = selected.output;
+    }
+
+    function saveChatToHistory({ model, prompt, output, stopped }) {
+      const item = {
+        id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        createdAt: new Date().toISOString(),
+        model,
+        prompt,
+        output,
+        stopped,
+      };
+      chatHistory.unshift(item);
+      chatHistory = chatHistory.slice(0, MAX_HISTORY_ITEMS);
+      localStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(chatHistory));
+      renderChatHistory(item.id);
+      setStatus(el.historyStatus, "Chat saved to history.", "ok");
+    }
+
+    function deleteSelectedHistory() {
+      const selectedId = el.historySelect.value;
+      if (!selectedId) return;
+      chatHistory = chatHistory.filter(item => item.id !== selectedId);
+      localStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(chatHistory));
+      renderChatHistory();
+      setStatus(el.historyStatus, "Selected chat deleted.", "ok");
+    }
+
+    function clearChatHistory() {
+      chatHistory = [];
+      localStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
+      renderChatHistory();
+      setStatus(el.historyStatus, "Chat history cleared.", "ok");
+    }
+
     async function copyOutput() {
       const text = el.output.textContent;
       if (!text) return;
@@ -772,10 +912,14 @@
     async function sendChatCompletion() {
       let settings;
       let body;
+      let responseAccepted = false;
+      let stopped = false;
+      let submittedPrompt = "";
 
       try {
         settings = getSettings();
         body = buildChatBody();
+        submittedPrompt = el.promptInput.value.trim();
         savePreferences();
       } catch (error) {
         setStatus(el.chatStatus, error.message, "err");
@@ -801,6 +945,8 @@
           throw new Error(`Failed to send chat request: HTTP ${response.status} ${errorText}`.trim());
         }
 
+        responseAccepted = true;
+
         if (!response.body) {
           throw new Error("The response does not support ReadableStream.");
         }
@@ -810,11 +956,20 @@
         setStatus(el.chatStatus, "Completed.", "ok");
       } catch (error) {
         if (error.name === "AbortError") {
+          stopped = true;
           setStatus(el.chatStatus, "Stopped.", "warn");
         } else {
           setStatus(el.chatStatus, error.message, "err");
         }
       } finally {
+        if (responseAccepted) {
+          saveChatToHistory({
+            model: body.model,
+            prompt: submittedPrompt,
+            output: el.output.textContent,
+            stopped,
+          });
+        }
         abortController = null;
         el.sendBtn.disabled = false;
         el.stopBtn.disabled = true;
@@ -893,10 +1048,14 @@
     el.stopBtn.addEventListener("click", stopStreaming);
     el.clearOutputBtn.addEventListener("click", clearOutput);
     el.copyOutputBtn.addEventListener("click", copyOutput);
+    el.historySelect.addEventListener("change", showSelectedHistory);
+    el.deleteHistoryBtn.addEventListener("click", deleteSelectedHistory);
+    el.clearHistoryBtn.addEventListener("click", clearChatHistory);
 
     loadSettings();
     loadPreferences();
     loadSavedSystemPrompts();
+    loadChatHistory();
   </script>
 </body>
 </html>
