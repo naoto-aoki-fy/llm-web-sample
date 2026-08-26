@@ -509,6 +509,10 @@
       return { baseUrl, apiKey };
     }
 
+    function hasCompleteSettings(settings) {
+      return Boolean(settings.baseUrl && settings.apiKey);
+    }
+
     function authHeaders(apiKey) {
       const headers = { "Content-Type": "application/json" };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
@@ -520,6 +524,7 @@
         const settings = getSettings();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
         setStatus(el.settingsStatus, "Settings saved to localStorage.", "ok");
+        if (hasCompleteSettings(settings)) loadModels();
       } catch (error) {
         setStatus(el.settingsStatus, error.message, "err");
       }
@@ -527,15 +532,17 @@
 
     function loadSettings() {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
+      if (!saved) return false;
       try {
         const settings = JSON.parse(saved);
         el.baseUrl.value = settings.baseUrl || "";
         el.apiKey.value = settings.apiKey || "";
         setStatus(el.settingsStatus, "Saved settings loaded.", "ok");
+        return hasCompleteSettings(settings);
       } catch {
         localStorage.removeItem(STORAGE_KEY);
         setStatus(el.settingsStatus, "Saved settings were corrupted and have been removed.", "warn");
+        return false;
       }
     }
 
@@ -1052,10 +1059,11 @@
     el.deleteHistoryBtn.addEventListener("click", deleteSelectedHistory);
     el.clearHistoryBtn.addEventListener("click", clearChatHistory);
 
-    loadSettings();
+    const shouldLoadModels = loadSettings();
     loadPreferences();
     loadSavedSystemPrompts();
     loadChatHistory();
+    if (shouldLoadModels) loadModels();
   </script>
 </body>
 </html>

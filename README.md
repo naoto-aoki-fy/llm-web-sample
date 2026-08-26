@@ -15,6 +15,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * No build step
 * No external JavaScript dependencies
 * Model list loading from `/v1/models`
+* Automatic model loading after endpoint and API key configuration, including on return visits
 * Streaming chat response support via Server-Sent Events style responses
 * One-click copying of the LLM response to the clipboard
 * Local chat history for reviewing previously submitted user prompts and LLM responses
@@ -61,16 +62,18 @@ The target API server must support browser access, including appropriate CORS he
 
 3. Enter an API key if required by your API server.
 
-4. Click **Save Settings**.
+4. Click **Save Settings**. When both the endpoint URL and API key are set, the client
+   automatically retrieves the available models. It also does this on page load when
+   both settings were remembered from an earlier visit. **Load Models** remains
+   available to refresh the list manually or to connect to an endpoint without an API
+   key.
 
-5. Click **Load Models** to retrieve available models.
-
-6. Select a model.
+5. Select a model.
 
    The selected model is remembered in `localStorage` and selected by default the next
    time it appears in a loaded model list.
 
-7. Optionally enter a **System Prompt Title** and **System Prompt**. The title is for
+6. Optionally enter a **System Prompt Title** and **System Prompt**. The title is for
    display in the browser only and is never included in a request to the LLM. The
    current title and prompt are recalled on the next visit.
 
@@ -93,11 +96,11 @@ The target API server must support browser access, including appropriate CORS he
 
    This checkbox is also recalled on the next visit.
 
-8. Enter a user prompt. Leading and trailing whitespace in the user prompt is removed
+7. Enter a user prompt. Leading and trailing whitespace in the user prompt is removed
    before it is sent. For a nonblank system prompt, whitespace is used only to decide
    whether the field is blank; the original system prompt text is sent unchanged.
 
-9. Optionally expand **Optional Parameters** and enter provider-specific settings in
+8. Optionally expand **Optional Parameters** and enter provider-specific settings in
    **Additional request parameters (JSON)**. For example:
 
    ```json
@@ -108,12 +111,12 @@ The target API server must support browser access, including appropriate CORS he
 
    This JSON text is saved as you edit it and restored on the next visit.
 
-10. Click **Send**.
+9. Click **Send**.
 
-11. Click **Copy** beside **Live Response** to copy the complete LLM response to the
+10. Click **Copy** beside **Live Response** to copy the complete LLM response to the
     clipboard. The button becomes available as soon as response text is received.
 
-12. Use **Chat History** to select and review a previous user input and LLM output.
+11. Use **Chat History** to select and review a previous user input and LLM output.
     Completed chats and partial responses from manually stopped chats are saved in
     `localStorage`. Up to 100 of the most recent chats are retained. You can delete an
     individual selected chat or clear the entire history.
