@@ -143,6 +143,21 @@
 
     .row > * { flex: 1; }
 
+    .checkbox-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-weight: 650;
+      margin: 14px 0 6px;
+      cursor: pointer;
+    }
+
+    .checkbox-row input {
+      width: auto;
+      margin: 5px 0 0;
+      flex: 0 0 auto;
+    }
+
     .btns {
       display: flex;
       gap: 10px;
@@ -279,7 +294,16 @@
         <label for="systemPromptInput">System Prompt</label>
         <textarea id="systemPromptInput" name="systemPromptInput" placeholder="Optionally describe how the assistant should respond"></textarea>
         <div class="hint">
-          Leave blank to send no system message. This chat input is kept only for this page session and is not saved by <strong>Save Settings</strong>.
+          Leave blank to send no system prompt. This value is saved as you type and recalled on your next visit.
+        </div>
+
+        <label class="checkbox-row" for="combinePromptsInput">
+          <input id="combinePromptsInput" type="checkbox" />
+          <span>Combine the system prompt with the user prompt for models that do not support system messages</span>
+        </label>
+        <div class="hint">
+          When enabled, the client sends one user message formatted as
+          <code>{system_prompt}<br><br>----<br><br>{user_prompt}</code> instead of a separate system message.
         </div>
 
         <label for="promptInput">Prompt</label>
@@ -348,6 +372,7 @@
       loadModelsBtn: document.getElementById("loadModelsBtn"),
       modelsStatus: document.getElementById("modelsStatus"),
       systemPromptInput: document.getElementById("systemPromptInput"),
+      combinePromptsInput: document.getElementById("combinePromptsInput"),
       promptInput: document.getElementById("promptInput"),
       temperature: document.getElementById("temperature"),
       maxTokens: document.getElementById("maxTokens"),
@@ -420,6 +445,8 @@
     function savePreferences() {
       const preferences = {
         model: el.modelSelect.value,
+        systemPrompt: el.systemPromptInput.value,
+        combinePrompts: el.combinePromptsInput.checked,
         additionalParameters: el.additionalParameters.value,
       };
       localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
@@ -432,6 +459,10 @@
       try {
         const preferences = JSON.parse(saved);
         savedModel = typeof preferences.model === "string" ? preferences.model : "";
+        el.systemPromptInput.value = typeof preferences.systemPrompt === "string"
+          ? preferences.systemPrompt
+          : "";
+        el.combinePromptsInput.checked = preferences.combinePrompts === true;
         el.additionalParameters.value = typeof preferences.additionalParameters === "string"
           ? preferences.additionalParameters
           : "";
@@ -446,6 +477,8 @@
       el.baseUrl.value = "";
       el.apiKey.value = "";
       savedModel = "";
+      el.systemPromptInput.value = "";
+      el.combinePromptsInput.checked = false;
       el.additionalParameters.value = "";
       el.modelSelect.innerHTML = '<option value="">No models loaded</option>';
       setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
@@ -543,10 +576,14 @@
 
       const messages = [];
       // Preserve intentional whitespace in the system prompt; trim only to test whether it is blank.
-      if (systemPrompt.trim()) {
+      if (systemPrompt.trim() && el.combinePromptsInput.checked) {
+        messages.push({ role: "user", content: `${systemPrompt}\n\n----\n\n${prompt}` });
+      } else if (systemPrompt.trim()) {
         messages.push({ role: "system", content: systemPrompt });
+        messages.push({ role: "user", content: prompt });
+      } else {
+        messages.push({ role: "user", content: prompt });
       }
-      messages.push({ role: "user", content: prompt });
 
       let body = {
         model,
@@ -708,6 +745,8 @@
     el.clearSettingsBtn.addEventListener("click", clearSettings);
     el.loadModelsBtn.addEventListener("click", loadModels);
     el.modelSelect.addEventListener("change", savePreferences);
+    el.systemPromptInput.addEventListener("input", savePreferences);
+    el.combinePromptsInput.addEventListener("change", savePreferences);
     el.additionalParameters.addEventListener("input", savePreferences);
     el.sendBtn.addEventListener("click", sendChatCompletion);
     el.stopBtn.addEventListener("click", stopStreaming);

@@ -17,7 +17,8 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * Model list loading from `/v1/models`
 * Streaming chat response support via Server-Sent Events style responses
 * Separate live display for streamed model thinking/reasoning
-* Optional system prompt sent before the user message
+* System prompt recording and recall through `localStorage`
+* Optional combined-prompt format for models without system-message support
 * Optional `temperature` and `max_tokens` parameters
 * Arbitrary provider-specific request parameters supplied as a JSON object
 * API settings saved in `localStorage`
@@ -68,8 +69,21 @@ The target API server must support browser access, including appropriate CORS he
    time it appears in a loaded model list.
 
 7. Optionally enter a **System Prompt**. If it is blank, the client sends no system
-   message. The system prompt is a session-only chat input: it remains in the page
-   while it is open, but **Save Settings** does not store it on the device.
+   message. The system prompt is saved as you type and recalled on the next visit.
+
+   For a model that does not support system messages, enable **Combine the system
+   prompt with the user prompt**. The client then sends a single user message in this
+   format:
+
+   ```text
+   {system_prompt}
+
+   ----
+
+   {user_prompt}
+   ```
+
+   This checkbox is also recalled on the next visit.
 
 8. Enter a user prompt. Leading and trailing whitespace in the user prompt is removed
    before it is sent. For a nonblank system prompt, whitespace is used only to decide
@@ -135,7 +149,10 @@ into the top level of the `/v1/chat/completions` request body without modificati
 When the system prompt is empty or contains only whitespace, `messages` contains only
 the user message. Otherwise, the system message is first and the user message is second.
 The system prompt's original whitespace is preserved, while the user prompt continues
-to have leading and trailing whitespace removed.
+to have leading and trailing whitespace removed. When the combined-prompt checkbox is
+enabled and the system prompt is nonblank, `messages` instead contains one user message.
+Its content is the original system prompt, two newlines, `----`, two newlines, and the
+trimmed user prompt.
 
 The keys `model`, `messages`, and `stream` are reserved and cannot be overridden by
 the additional JSON. The keys `temperature` and `max_tokens` are also rejected there:
@@ -167,7 +184,8 @@ these fields simply leave the **Live Thinking** panel empty.
 
 ## Security Notes
 
-This client stores the API endpoint and API key in the browser's `localStorage`.
+This client stores the API endpoint, API key, selected model, system prompt, combined-
+prompt preference, and additional request parameters in the browser's `localStorage`.
 
 Do not use it on:
 
