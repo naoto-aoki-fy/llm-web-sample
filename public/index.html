@@ -336,6 +336,7 @@
 
   <script>
     const STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
+    const PREFERENCES_STORAGE_KEY = "openai-compatible-chat-client-preferences:v1";
 
     const el = {
       baseUrl: document.getElementById("baseUrl"),
@@ -362,6 +363,7 @@
     };
 
     let abortController = null;
+    let savedModel = "";
 
     function setStatus(node, message, type = "") {
       node.textContent = message;
@@ -415,10 +417,36 @@
       }
     }
 
+    function savePreferences() {
+      const preferences = {
+        model: el.modelSelect.value,
+        additionalParameters: el.additionalParameters.value,
+      };
+      localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+      savedModel = preferences.model;
+    }
+
+    function loadPreferences() {
+      const saved = localStorage.getItem(PREFERENCES_STORAGE_KEY);
+      if (!saved) return;
+      try {
+        const preferences = JSON.parse(saved);
+        savedModel = typeof preferences.model === "string" ? preferences.model : "";
+        el.additionalParameters.value = typeof preferences.additionalParameters === "string"
+          ? preferences.additionalParameters
+          : "";
+      } catch {
+        localStorage.removeItem(PREFERENCES_STORAGE_KEY);
+      }
+    }
+
     function clearSettings() {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(PREFERENCES_STORAGE_KEY);
       el.baseUrl.value = "";
       el.apiKey.value = "";
+      savedModel = "";
+      el.additionalParameters.value = "";
       el.modelSelect.innerHTML = '<option value="">No models loaded</option>';
       setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
     }
@@ -456,7 +484,7 @@
         }
 
         models.sort((a, b) => a.localeCompare(b));
-        const previouslySelected = el.modelSelect.value;
+        const previouslySelected = el.modelSelect.value || savedModel;
         el.modelSelect.innerHTML = models
           .map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`)
           .join("");
@@ -576,6 +604,7 @@
       try {
         settings = getSettings();
         body = buildChatBody();
+        savePreferences();
       } catch (error) {
         setStatus(el.chatStatus, error.message, "err");
         return;
@@ -678,11 +707,14 @@
     el.saveSettingsBtn.addEventListener("click", saveSettings);
     el.clearSettingsBtn.addEventListener("click", clearSettings);
     el.loadModelsBtn.addEventListener("click", loadModels);
+    el.modelSelect.addEventListener("change", savePreferences);
+    el.additionalParameters.addEventListener("input", savePreferences);
     el.sendBtn.addEventListener("click", sendChatCompletion);
     el.stopBtn.addEventListener("click", stopStreaming);
     el.clearOutputBtn.addEventListener("click", clearOutput);
 
     loadSettings();
+    loadPreferences();
   </script>
 </body>
 </html>

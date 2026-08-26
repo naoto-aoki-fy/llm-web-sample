@@ -21,6 +21,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * Optional `temperature` and `max_tokens` parameters
 * Arbitrary provider-specific request parameters supplied as a JSON object
 * API settings saved in `localStorage`
+* The selected model and additional request parameters restored on the next visit
 * Light and dark color schemes using `prefers-color-scheme`
 * Solid background styling without gradients
 
@@ -63,6 +64,9 @@ The target API server must support browser access, including appropriate CORS he
 
 6. Select a model.
 
+   The selected model is remembered in `localStorage` and selected by default the next
+   time it appears in a loaded model list.
+
 7. Optionally enter a **System Prompt**. If it is blank, the client sends no system
    message. The system prompt is a session-only chat input: it remains in the page
    while it is open, but **Save Settings** does not store it on the device.
@@ -79,6 +83,8 @@ The target API server must support browser access, including appropriate CORS he
      "reasoning_effort": "none"
    }
    ```
+
+   This JSON text is saved as you edit it and restored on the next visit.
 
 10. Click **Send**.
 
