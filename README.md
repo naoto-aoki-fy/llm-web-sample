@@ -14,6 +14,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * Single HTML file
 * No build step
 * No external JavaScript dependencies
+* Chat, configuration, and history modes that keep each workflow focused
 * Model list loading from `/v1/models`
 * Automatic model loading after endpoint and API key configuration, including on return visits
 * Streaming chat response support via Server-Sent Events style responses
@@ -44,7 +45,7 @@ The target API server must support browser access, including appropriate CORS he
 
 1. Open the HTML file in a modern browser.
 
-2. Enter the API endpoint URL.
+2. Select **Config**, then enter the API endpoint URL.
 
    Example:
 
@@ -96,7 +97,7 @@ The target API server must support browser access, including appropriate CORS he
 
    This checkbox is also recalled on the next visit.
 
-7. Enter a user prompt. Leading and trailing whitespace in the user prompt is removed
+7. Select **Chat** and enter a user prompt. Leading and trailing whitespace in the user prompt is removed
    before it is sent. For a nonblank system prompt, whitespace is used only to decide
    whether the field is blank; the original system prompt text is sent unchanged.
 
@@ -116,7 +117,7 @@ The target API server must support browser access, including appropriate CORS he
 10. Click **Copy** beside **Live Response** to copy the complete LLM response to the
     clipboard. The button becomes available as soon as response text is received.
 
-11. Use **Chat History** to select and review a previous user input and LLM output.
+11. Select **History** to review a previous user input and LLM output.
     Completed chats and partial responses from manually stopped chats are saved in
     `localStorage`. Up to 100 of the most recent chats are retained. You can delete an
     individual selected chat or clear the entire history.

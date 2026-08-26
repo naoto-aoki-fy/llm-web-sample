@@ -82,6 +82,30 @@
       margin: 0 0 24px;
     }
 
+    .mode-switcher {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding: 5px;
+      width: fit-content;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+    }
+
+    .mode-button {
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid transparent;
+    }
+
+    .mode-button[aria-selected="true"] {
+      color: var(--accent-text);
+      background: var(--accent);
+    }
+
+    .mode-panel[hidden] { display: none; }
+
     .grid {
       display: grid;
       grid-template-columns: 1fr;
@@ -285,10 +309,16 @@
     <h1>OpenAI-Compatible API Chat Client</h1>
     <p class="subtitle">A minimal browser client that directly accesses <code>/v1/models</code> and <code>/v1/chat/completions</code>.</p>
 
+    <nav class="mode-switcher" aria-label="Application mode" role="tablist">
+      <button id="chatModeBtn" class="mode-button" type="button" role="tab" aria-selected="true" aria-controls="chatMode">Chat</button>
+      <button id="configModeBtn" class="mode-button" type="button" role="tab" aria-selected="false" aria-controls="configMode">Config</button>
+      <button id="historyModeBtn" class="mode-button" type="button" role="tab" aria-selected="false" aria-controls="historyMode">History</button>
+    </nav>
+
     <div class="grid">
-      <section>
+      <section id="configMode" class="mode-panel" role="tabpanel" aria-labelledby="configModeBtn" hidden>
         <div class="card">
-          <h2>1. API Settings</h2>
+          <h2>API Settings</h2>
 
           <label for="baseUrl">Endpoint URL</label>
           <input id="baseUrl" type="url" placeholder="https://api.example.com or https://api.example.com/v1" autocomplete="off" />
@@ -306,7 +336,7 @@
         </div>
 
         <div class="card">
-          <h2>2. Model List</h2>
+          <h2>Model List</h2>
 
           <label for="modelSelect">Model</label>
           <select id="modelSelect">
@@ -318,10 +348,9 @@
           </div>
           <div id="modelsStatus" class="status"></div>
         </div>
-      </section>
 
-      <section class="card">
-        <h2>3. Send Chat Request</h2>
+        <div class="card">
+          <h2>System Prompt</h2>
 
         <label for="systemPromptTitleInput">System Prompt Title</label>
         <input id="systemPromptTitleInput" type="text" placeholder="For example, Concise assistant" autocomplete="off" />
@@ -354,6 +383,11 @@
           When enabled, the client sends one user message formatted as
           <code>{system_prompt}<br><br>----<br><br>{user_prompt}</code> instead of a separate system message.
         </div>
+        </div>
+      </section>
+
+      <section id="chatMode" class="mode-panel card" role="tabpanel" aria-labelledby="chatModeBtn">
+        <h2>Send Chat Request</h2>
 
         <label for="promptInput">Prompt</label>
         <textarea id="promptInput" placeholder="Enter your prompt here"></textarea>
@@ -408,8 +442,8 @@
         <div id="output" class="output" aria-live="polite"></div>
       </section>
 
-      <section class="card">
-        <h2>4. Chat History</h2>
+      <section id="historyMode" class="mode-panel card" role="tabpanel" aria-labelledby="historyModeBtn" hidden>
+        <h2>Chat History</h2>
         <div class="hint">Completed and stopped chats are stored in this browser. Select one to review the user input and LLM output.</div>
 
         <label for="historySelect">Saved Chats</label>
@@ -446,6 +480,8 @@
     const MAX_HISTORY_ITEMS = 100;
 
     const el = {
+      modeButtons: [...document.querySelectorAll(".mode-button")],
+      modePanels: [...document.querySelectorAll(".mode-panel")],
       baseUrl: document.getElementById("baseUrl"),
       apiKey: document.getElementById("apiKey"),
       saveSettingsBtn: document.getElementById("saveSettingsBtn"),
@@ -488,6 +524,18 @@
     let savedModel = "";
     let savedSystemPrompts = [];
     let chatHistory = [];
+
+    function selectMode(mode) {
+      const selectedPanelId = `${mode}Mode`;
+      el.modeButtons.forEach(button => {
+        const selected = button.getAttribute("aria-controls") === selectedPanelId;
+        button.setAttribute("aria-selected", String(selected));
+        button.tabIndex = selected ? 0 : -1;
+      });
+      el.modePanels.forEach(panel => {
+        panel.hidden = panel.id !== selectedPanelId;
+      });
+    }
 
     function setStatus(node, message, type = "") {
       node.textContent = message;
@@ -1040,6 +1088,17 @@
       if (abortController) abortController.abort();
     }
 
+    el.modeButtons.forEach((button, index) => {
+      button.addEventListener("click", () => selectMode(button.id.replace("ModeBtn", "")));
+      button.addEventListener("keydown", event => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const offset = event.key === "ArrowRight" ? 1 : -1;
+        const nextButton = el.modeButtons[(index + offset + el.modeButtons.length) % el.modeButtons.length];
+        selectMode(nextButton.id.replace("ModeBtn", ""));
+        nextButton.focus();
+      });
+    });
     el.saveSettingsBtn.addEventListener("click", saveSettings);
     el.clearSettingsBtn.addEventListener("click", clearSettings);
     el.loadModelsBtn.addEventListener("click", loadModels);
@@ -1065,6 +1124,7 @@
     loadPreferences();
     loadSavedSystemPrompts();
     loadChatHistory();
+    selectMode("chat");
     if (shouldLoadModels) loadModels();
   </script>
 </body>
