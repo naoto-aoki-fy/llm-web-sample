@@ -474,10 +474,11 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
-    const PREFERENCES_STORAGE_KEY = "openai-compatible-chat-client-preferences:v1";
-    const SYSTEM_PROMPTS_STORAGE_KEY = "openai-compatible-chat-client-system-prompts:v1";
-    const CHAT_HISTORY_STORAGE_KEY = "openai-compatible-chat-client-history:v1";
+    const STORAGE_KEY_PREFIX = window.location.href;
+    const STORAGE_KEY = `${STORAGE_KEY_PREFIX}:settings:v1`;
+    const PREFERENCES_STORAGE_KEY = `${STORAGE_KEY_PREFIX}:preferences:v1`;
+    const SYSTEM_PROMPTS_STORAGE_KEY = `${STORAGE_KEY_PREFIX}:system-prompts:v1`;
+    const CHAT_HISTORY_STORAGE_KEY = `${STORAGE_KEY_PREFIX}:history:v1`;
     const MAX_HISTORY_ITEMS = 100;
 
     const el = {
