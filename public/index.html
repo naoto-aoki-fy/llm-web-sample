@@ -291,10 +291,27 @@
       <section class="card">
         <h2>3. Send Chat Request</h2>
 
+        <label for="systemPromptTitleInput">System Prompt Title</label>
+        <input id="systemPromptTitleInput" type="text" placeholder="For example, Concise assistant" autocomplete="off" />
+        <div class="hint">The title is used only to identify saved prompts and is never sent to the LLM.</div>
+
         <label for="systemPromptInput">System Prompt</label>
         <textarea id="systemPromptInput" name="systemPromptInput" placeholder="Optionally describe how the assistant should respond"></textarea>
         <div class="hint">
-          Leave blank to send no system prompt. This value is saved as you type and recalled on your next visit.
+          Leave blank to send no system prompt. The current title and prompt are recalled on your next visit.
+        </div>
+
+        <div class="btns">
+          <button id="saveSystemPromptBtn" type="button">Save System Prompt</button>
+        </div>
+        <div id="systemPromptStatus" class="status"></div>
+
+        <label for="savedSystemPromptSelect">Saved System Prompts</label>
+        <div class="row">
+          <select id="savedSystemPromptSelect">
+            <option value="">No saved system prompts</option>
+          </select>
+          <button id="useSystemPromptBtn" type="button" class="secondary" disabled>Use Selected Prompt</button>
         </div>
 
         <label class="checkbox-row" for="combinePromptsInput">
@@ -361,6 +378,7 @@
   <script>
     const STORAGE_KEY = "openai-compatible-chat-client-settings:v1";
     const PREFERENCES_STORAGE_KEY = "openai-compatible-chat-client-preferences:v1";
+    const SYSTEM_PROMPTS_STORAGE_KEY = "openai-compatible-chat-client-system-prompts:v1";
 
     const el = {
       baseUrl: document.getElementById("baseUrl"),
@@ -371,7 +389,12 @@
       modelSelect: document.getElementById("modelSelect"),
       loadModelsBtn: document.getElementById("loadModelsBtn"),
       modelsStatus: document.getElementById("modelsStatus"),
+      systemPromptTitleInput: document.getElementById("systemPromptTitleInput"),
       systemPromptInput: document.getElementById("systemPromptInput"),
+      saveSystemPromptBtn: document.getElementById("saveSystemPromptBtn"),
+      systemPromptStatus: document.getElementById("systemPromptStatus"),
+      savedSystemPromptSelect: document.getElementById("savedSystemPromptSelect"),
+      useSystemPromptBtn: document.getElementById("useSystemPromptBtn"),
       combinePromptsInput: document.getElementById("combinePromptsInput"),
       promptInput: document.getElementById("promptInput"),
       temperature: document.getElementById("temperature"),
@@ -389,6 +412,7 @@
 
     let abortController = null;
     let savedModel = "";
+    let savedSystemPrompts = [];
 
     function setStatus(node, message, type = "") {
       node.textContent = message;
@@ -445,6 +469,7 @@
     function savePreferences() {
       const preferences = {
         model: el.modelSelect.value,
+        systemPromptTitle: el.systemPromptTitleInput.value,
         systemPrompt: el.systemPromptInput.value,
         combinePrompts: el.combinePromptsInput.checked,
         additionalParameters: el.additionalParameters.value,
@@ -459,6 +484,9 @@
       try {
         const preferences = JSON.parse(saved);
         savedModel = typeof preferences.model === "string" ? preferences.model : "";
+        el.systemPromptTitleInput.value = typeof preferences.systemPromptTitle === "string"
+          ? preferences.systemPromptTitle
+          : "";
         el.systemPromptInput.value = typeof preferences.systemPrompt === "string"
           ? preferences.systemPrompt
           : "";
@@ -471,16 +499,78 @@
       }
     }
 
+    function loadSavedSystemPrompts() {
+      const saved = localStorage.getItem(SYSTEM_PROMPTS_STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          savedSystemPrompts = Array.isArray(parsed)
+            ? parsed.filter(item => item && typeof item.title === "string" && typeof item.prompt === "string")
+            : [];
+        } catch {
+          localStorage.removeItem(SYSTEM_PROMPTS_STORAGE_KEY);
+          setStatus(el.systemPromptStatus, "Saved system prompts were corrupted and have been removed.", "warn");
+        }
+      }
+      renderSavedSystemPrompts();
+    }
+
+    function renderSavedSystemPrompts(selectedTitle = "") {
+      const prompts = [...savedSystemPrompts].sort((a, b) => a.title.localeCompare(b.title));
+      el.savedSystemPromptSelect.innerHTML = prompts.length
+        ? '<option value="">Select a saved system prompt</option>' + prompts
+          .map(item => `<option value="${escapeHtml(item.title)}">${escapeHtml(item.title)}</option>`)
+          .join("")
+        : '<option value="">No saved system prompts</option>';
+      if (selectedTitle && prompts.some(item => item.title === selectedTitle)) {
+        el.savedSystemPromptSelect.value = selectedTitle;
+      }
+      el.useSystemPromptBtn.disabled = !el.savedSystemPromptSelect.value;
+    }
+
+    function saveSystemPrompt() {
+      const title = el.systemPromptTitleInput.value.trim();
+      if (!title) {
+        setStatus(el.systemPromptStatus, "Enter a title before saving the system prompt.", "err");
+        return;
+      }
+
+      const existingIndex = savedSystemPrompts.findIndex(item => item.title === title);
+      const savedPrompt = { title, prompt: el.systemPromptInput.value };
+      if (existingIndex >= 0) savedSystemPrompts[existingIndex] = savedPrompt;
+      else savedSystemPrompts.push(savedPrompt);
+
+      localStorage.setItem(SYSTEM_PROMPTS_STORAGE_KEY, JSON.stringify(savedSystemPrompts));
+      el.systemPromptTitleInput.value = title;
+      savePreferences();
+      renderSavedSystemPrompts(title);
+      setStatus(el.systemPromptStatus, existingIndex >= 0 ? "Saved system prompt updated." : "System prompt saved.", "ok");
+    }
+
+    function useSelectedSystemPrompt() {
+      const selected = savedSystemPrompts.find(item => item.title === el.savedSystemPromptSelect.value);
+      if (!selected) return;
+      el.systemPromptTitleInput.value = selected.title;
+      el.systemPromptInput.value = selected.prompt;
+      savePreferences();
+      setStatus(el.systemPromptStatus, `Using “${selected.title}”.`, "ok");
+    }
+
     function clearSettings() {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(PREFERENCES_STORAGE_KEY);
+      localStorage.removeItem(SYSTEM_PROMPTS_STORAGE_KEY);
       el.baseUrl.value = "";
       el.apiKey.value = "";
       savedModel = "";
+      savedSystemPrompts = [];
+      el.systemPromptTitleInput.value = "";
       el.systemPromptInput.value = "";
       el.combinePromptsInput.checked = false;
       el.additionalParameters.value = "";
       el.modelSelect.innerHTML = '<option value="">No models loaded</option>';
+      renderSavedSystemPrompts();
+      setStatus(el.systemPromptStatus, "", "");
       setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
     }
 
@@ -745,7 +835,13 @@
     el.clearSettingsBtn.addEventListener("click", clearSettings);
     el.loadModelsBtn.addEventListener("click", loadModels);
     el.modelSelect.addEventListener("change", savePreferences);
+    el.systemPromptTitleInput.addEventListener("input", savePreferences);
     el.systemPromptInput.addEventListener("input", savePreferences);
+    el.saveSystemPromptBtn.addEventListener("click", saveSystemPrompt);
+    el.savedSystemPromptSelect.addEventListener("change", () => {
+      el.useSystemPromptBtn.disabled = !el.savedSystemPromptSelect.value;
+    });
+    el.useSystemPromptBtn.addEventListener("click", useSelectedSystemPrompt);
     el.combinePromptsInput.addEventListener("change", savePreferences);
     el.additionalParameters.addEventListener("input", savePreferences);
     el.sendBtn.addEventListener("click", sendChatCompletion);
@@ -754,6 +850,7 @@
 
     loadSettings();
     loadPreferences();
+    loadSavedSystemPrompts();
   </script>
 </body>
 </html>

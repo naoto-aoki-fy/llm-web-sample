@@ -17,7 +17,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * Model list loading from `/v1/models`
 * Streaming chat response support via Server-Sent Events style responses
 * Separate live display for streamed model thinking/reasoning
-* System prompt recording and recall through `localStorage`
+* Named system prompt saving and recall through `localStorage`
 * Optional combined-prompt format for models without system-message support
 * Optional `temperature` and `max_tokens` parameters
 * Arbitrary provider-specific request parameters supplied as a JSON object
@@ -68,8 +68,14 @@ The target API server must support browser access, including appropriate CORS he
    The selected model is remembered in `localStorage` and selected by default the next
    time it appears in a loaded model list.
 
-7. Optionally enter a **System Prompt**. If it is blank, the client sends no system
-   message. The system prompt is saved as you type and recalled on the next visit.
+7. Optionally enter a **System Prompt Title** and **System Prompt**. The title is for
+   display in the browser only and is never included in a request to the LLM. The
+   current title and prompt are recalled on the next visit.
+
+   Click **Save System Prompt** to add the prompt to the **Saved System Prompts** list.
+   Saving with an existing title updates that saved prompt. To recall one, select its
+   title and click **Use Selected Prompt**. Saved prompts are stored in `localStorage`.
+   If the prompt is blank, the client sends no system message.
 
    For a model that does not support system messages, enable **Combine the system
    prompt with the user prompt**. The client then sends a single user message in this
@@ -184,8 +190,9 @@ these fields simply leave the **Live Thinking** panel empty.
 
 ## Security Notes
 
-This client stores the API endpoint, API key, selected model, system prompt, combined-
-prompt preference, and additional request parameters in the browser's `localStorage`.
+This client stores the API endpoint, API key, selected model, current and saved named
+system prompts, combined-prompt preference, and additional request parameters in the
+browser's `localStorage`.
 
 Do not use it on:
 
