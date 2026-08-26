@@ -199,8 +199,9 @@ choices[0].text
 When a compatible provider exposes its reasoning, the client displays it separately
 from the final response. It recognizes the commonly used streaming fields
 `choices[0].delta.reasoning_content` and `choices[0].delta.reasoning`, plus
-`choices[0].reasoning_content` as a fallback. Providers that do not return one of
-these fields simply leave the **Live Thinking** panel empty.
+`choices[0].reasoning_content` as a fallback. The **Live Thinking** panel appears when
+the first reasoning content is received. Providers and non-reasoning models that do
+not return one of these fields leave the panel hidden.
 
 ## Security Notes
 

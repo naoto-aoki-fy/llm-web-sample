@@ -427,11 +427,13 @@
 
         <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
-        <div class="meta">
-          <span>Live Thinking</span>
-          <span id="thinkingCounter">0 chars</span>
+        <div id="thinkingSection" hidden>
+          <div class="meta">
+            <span>Live Thinking</span>
+            <span id="thinkingCounter">0 chars</span>
+          </div>
+          <div id="thinkingOutput" class="output thinking" aria-live="polite"></div>
         </div>
-        <div id="thinkingOutput" class="output thinking" aria-live="polite"></div>
 
         <div class="meta">
           <span>Live Response</span>
@@ -508,6 +510,7 @@
       clearOutputBtn: document.getElementById("clearOutputBtn"),
       copyOutputBtn: document.getElementById("copyOutputBtn"),
       chatStatus: document.getElementById("chatStatus"),
+      thinkingSection: document.getElementById("thinkingSection"),
       thinkingOutput: document.getElementById("thinkingOutput"),
       thinkingCounter: document.getElementById("thinkingCounter"),
       output: document.getElementById("output"),
@@ -774,12 +777,14 @@
     }
 
     function appendThinking(text) {
+      el.thinkingSection.hidden = false;
       el.thinkingOutput.textContent += text;
       el.thinkingOutput.scrollTop = el.thinkingOutput.scrollHeight;
       el.thinkingCounter.textContent = `${el.thinkingOutput.textContent.length} chars`;
     }
 
     function clearOutput() {
+      el.thinkingSection.hidden = true;
       el.thinkingOutput.textContent = "";
       el.thinkingCounter.textContent = "0 chars";
       el.output.textContent = "";
