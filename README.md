@@ -25,7 +25,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * Optional combined-prompt format for models without system-message support
 * Optional `temperature` and `max_tokens` parameters
 * Arbitrary provider-specific request parameters supplied as a JSON object
-* API settings saved in `localStorage`
+* API settings automatically saved in `localStorage` as you edit them
 * The selected model and additional request parameters restored on the next visit
 * Light and dark color schemes using `prefers-color-scheme`
 * Solid background styling without gradients
@@ -63,11 +63,12 @@ The target API server must support browser access, including appropriate CORS he
 
 3. Enter an API key if required by your API server.
 
-4. Click **Save Settings**. When both the endpoint URL and API key are set, the client
-   automatically retrieves the available models. It also does this on page load when
-   both settings were remembered from an earlier visit. **Load Models** remains
-   available to refresh the list manually or to connect to an endpoint without an API
-   key.
+4. The API settings are saved automatically as you edit them. When both the endpoint
+   URL and API key are set, the client automatically retrieves the available models.
+   It also does this on page load when both settings were remembered from an earlier
+   visit. **Load Models** remains available to refresh the list manually or to connect
+   to an endpoint without an API key. Clear both fields to remove the saved API
+   settings.
 
 5. Select a model.
 

@@ -328,10 +328,6 @@
           <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
           <div class="hint">This is stored in localStorage. Do not use this on shared computers or public terminals.</div>
 
-          <div class="btns">
-            <button id="saveSettingsBtn">Save Settings</button>
-            <button id="clearSettingsBtn" class="secondary">Clear Settings</button>
-          </div>
           <div id="settingsStatus" class="status"></div>
         </div>
 
@@ -488,8 +484,6 @@
       modePanels: [...document.querySelectorAll(".mode-panel")],
       baseUrl: document.getElementById("baseUrl"),
       apiKey: document.getElementById("apiKey"),
-      saveSettingsBtn: document.getElementById("saveSettingsBtn"),
-      clearSettingsBtn: document.getElementById("clearSettingsBtn"),
       settingsStatus: document.getElementById("settingsStatus"),
       modelSelect: document.getElementById("modelSelect"),
       loadModelsBtn: document.getElementById("loadModelsBtn"),
@@ -526,6 +520,7 @@
     };
 
     let abortController = null;
+    let settingsSaveTimer = null;
     let savedModel = "";
     let savedSystemPrompts = [];
     let chatHistory = [];
@@ -575,14 +570,31 @@
     }
 
     function saveSettings() {
+      const baseUrl = el.baseUrl.value.trim();
+      const apiKey = el.apiKey.value.trim();
+
+      if (!baseUrl && !apiKey) {
+        localStorage.removeItem(STORAGE_KEY);
+        setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
+        return;
+      }
+
       try {
-        const settings = getSettings();
+        const settings = {
+          baseUrl: baseUrl ? normalizeBaseUrl(baseUrl) : "",
+          apiKey,
+        };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        setStatus(el.settingsStatus, "Settings saved to localStorage.", "ok");
+        setStatus(el.settingsStatus, "Settings saved automatically.", "ok");
         if (hasCompleteSettings(settings)) loadModels();
       } catch (error) {
         setStatus(el.settingsStatus, error.message, "err");
       }
+    }
+
+    function scheduleSettingsSave() {
+      clearTimeout(settingsSaveTimer);
+      settingsSaveTimer = setTimeout(saveSettings, 500);
     }
 
     function loadSettings() {
@@ -689,24 +701,6 @@
       el.systemPromptInput.value = selected.prompt;
       savePreferences();
       setStatus(el.systemPromptStatus, `Using “${selected.title}”.`, "ok");
-    }
-
-    function clearSettings() {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(PREFERENCES_STORAGE_KEY);
-      localStorage.removeItem(SYSTEM_PROMPTS_STORAGE_KEY);
-      el.baseUrl.value = "";
-      el.apiKey.value = "";
-      savedModel = "";
-      savedSystemPrompts = [];
-      el.systemPromptTitleInput.value = "";
-      el.systemPromptInput.value = "";
-      el.combinePromptsInput.checked = false;
-      el.additionalParameters.value = "";
-      el.modelSelect.innerHTML = '<option value="">No models loaded</option>';
-      renderSavedSystemPrompts();
-      setStatus(el.systemPromptStatus, "", "");
-      setStatus(el.settingsStatus, "Saved settings cleared.", "ok");
     }
 
     async function loadModels() {
@@ -1106,8 +1100,8 @@
         nextButton.focus();
       });
     });
-    el.saveSettingsBtn.addEventListener("click", saveSettings);
-    el.clearSettingsBtn.addEventListener("click", clearSettings);
+    el.baseUrl.addEventListener("input", scheduleSettingsSave);
+    el.apiKey.addEventListener("input", scheduleSettingsSave);
     el.loadModelsBtn.addEventListener("click", loadModels);
     el.modelSelect.addEventListener("change", savePreferences);
     el.systemPromptTitleInput.addEventListener("input", savePreferences);
