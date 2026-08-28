@@ -285,6 +285,10 @@
       max-height: 280px;
     }
 
+    #historySelect {
+      min-height: 180px;
+    }
+
     code {
       background: var(--code-bg);
       border: 1px solid var(--border);
@@ -443,16 +447,16 @@
 
       <section id="historyMode" class="mode-panel card" role="tabpanel" aria-labelledby="historyModeBtn" hidden>
         <h2>Chat History</h2>
-        <div class="hint">Completed and stopped chats are stored in this browser. Select one to review the user input and LLM output.</div>
+        <div class="hint">Completed and stopped chats are stored in this browser. Select one or more chats to delete them; the first selected chat is shown below.</div>
 
-        <label for="historySelect">Saved Chats</label>
-        <select id="historySelect">
+        <label for="historySelect">Saved Chats (multiple selection allowed)</label>
+        <select id="historySelect" multiple aria-describedby="historySelectionHint">
           <option value="">No saved chats</option>
         </select>
+        <div id="historySelectionHint" class="hint">Use Ctrl/Command-click to select individual chats, or Shift-click to select a range.</div>
 
         <div class="btns">
-          <button id="deleteHistoryBtn" type="button" class="secondary" disabled>Delete Selected</button>
-          <button id="clearHistoryBtn" type="button" class="danger" disabled>Clear History</button>
+          <button id="deleteHistoryBtn" type="button" class="danger" disabled>Delete Selected</button>
         </div>
         <div id="historyStatus" class="status"></div>
 
@@ -511,7 +515,6 @@
       tokenCounter: document.getElementById("tokenCounter"),
       historySelect: document.getElementById("historySelect"),
       deleteHistoryBtn: document.getElementById("deleteHistoryBtn"),
-      clearHistoryBtn: document.getElementById("clearHistoryBtn"),
       historyStatus: document.getElementById("historyStatus"),
       historyDetail: document.getElementById("historyDetail"),
       historyMeta: document.getElementById("historyMeta"),
@@ -813,7 +816,7 @@
 
     function renderChatHistory(selectedId = "") {
       el.historySelect.innerHTML = chatHistory.length
-        ? '<option value="">Select a saved chat</option>' + chatHistory
+        ? chatHistory
           .map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(formatHistoryLabel(item))}</option>`)
           .join("")
         : '<option value="">No saved chats</option>';
@@ -822,12 +825,15 @@
         el.historySelect.value = selectedId;
       }
       showSelectedHistory();
-      el.clearHistoryBtn.disabled = chatHistory.length === 0;
     }
 
     function showSelectedHistory() {
-      const selected = chatHistory.find(item => item.id === el.historySelect.value);
-      el.deleteHistoryBtn.disabled = !selected;
+      const selectedIds = [...el.historySelect.selectedOptions].map(option => option.value);
+      const selected = chatHistory.find(item => item.id === selectedIds[0]);
+      el.deleteHistoryBtn.disabled = selectedIds.length === 0;
+      el.deleteHistoryBtn.textContent = selectedIds.length > 1
+        ? `Delete Selected (${selectedIds.length})`
+        : "Delete Selected";
       el.historyDetail.hidden = !selected;
       if (!selected) return;
 
@@ -855,19 +861,17 @@
     }
 
     function deleteSelectedHistory() {
-      const selectedId = el.historySelect.value;
-      if (!selectedId) return;
-      chatHistory = chatHistory.filter(item => item.id !== selectedId);
-      localStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(chatHistory));
+      const selectedIds = new Set([...el.historySelect.selectedOptions].map(option => option.value));
+      if (selectedIds.size === 0) return;
+      chatHistory = chatHistory.filter(item => !selectedIds.has(item.id));
+      if (chatHistory.length) localStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(chatHistory));
+      else localStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
       renderChatHistory();
-      setStatus(el.historyStatus, "Selected chat deleted.", "ok");
-    }
-
-    function clearChatHistory() {
-      chatHistory = [];
-      localStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
-      renderChatHistory();
-      setStatus(el.historyStatus, "Chat history cleared.", "ok");
+      setStatus(
+        el.historyStatus,
+        `${selectedIds.size} ${selectedIds.size === 1 ? "chat" : "chats"} deleted.`,
+        "ok"
+      );
     }
 
     async function copyOutput() {
@@ -1119,7 +1123,6 @@
     el.copyOutputBtn.addEventListener("click", copyOutput);
     el.historySelect.addEventListener("change", showSelectedHistory);
     el.deleteHistoryBtn.addEventListener("click", deleteSelectedHistory);
-    el.clearHistoryBtn.addEventListener("click", clearChatHistory);
 
     const shouldLoadModels = loadSettings();
     loadPreferences();
