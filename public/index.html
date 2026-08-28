@@ -289,6 +289,35 @@
       min-height: 180px;
     }
 
+    .history-selection-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .history-selection-bar .btns {
+      margin-top: 0;
+    }
+
+    .history-selection-bar button {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .history-selection-count {
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 520px) {
+      .history-selection-bar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
     code {
       background: var(--code-bg);
       border: 1px solid var(--border);
@@ -446,7 +475,7 @@
       </section>
 
       <section id="historyMode" class="mode-panel card" role="tabpanel" aria-labelledby="historyModeBtn" hidden>
-        <h2>Chat History</h2>
+        <h2>Translation History</h2>
         <div class="hint">Completed and stopped chats are stored in this browser. Select one or more chats to delete them; the first selected chat is shown below.</div>
 
         <label for="historySelect">Saved Chats (multiple selection allowed)</label>
@@ -454,6 +483,14 @@
           <option value="">No saved chats</option>
         </select>
         <div id="historySelectionHint" class="hint">Use Ctrl/Command-click to select individual chats, or Shift-click to select a range.</div>
+
+        <div class="history-selection-bar">
+          <div class="btns">
+            <button id="selectAllHistoryBtn" type="button" class="secondary" disabled>Select All</button>
+            <button id="clearHistorySelectionBtn" type="button" class="secondary" disabled>Clear Selection</button>
+          </div>
+          <div id="historySelectionCount" class="hint history-selection-count" aria-live="polite">0 selected</div>
+        </div>
 
         <div class="btns">
           <button id="deleteHistoryBtn" type="button" class="danger" disabled>Delete Selected</button>
@@ -514,6 +551,9 @@
       output: document.getElementById("output"),
       tokenCounter: document.getElementById("tokenCounter"),
       historySelect: document.getElementById("historySelect"),
+      selectAllHistoryBtn: document.getElementById("selectAllHistoryBtn"),
+      clearHistorySelectionBtn: document.getElementById("clearHistorySelectionBtn"),
+      historySelectionCount: document.getElementById("historySelectionCount"),
       deleteHistoryBtn: document.getElementById("deleteHistoryBtn"),
       historyStatus: document.getElementById("historyStatus"),
       historyDetail: document.getElementById("historyDetail"),
@@ -828,9 +868,12 @@
     }
 
     function showSelectedHistory() {
-      const selectedIds = [...el.historySelect.selectedOptions].map(option => option.value);
+      const selectedIds = [...el.historySelect.selectedOptions].map(option => option.value).filter(Boolean);
       const selected = chatHistory.find(item => item.id === selectedIds[0]);
       el.deleteHistoryBtn.disabled = selectedIds.length === 0;
+      el.selectAllHistoryBtn.disabled = chatHistory.length === 0 || selectedIds.length === chatHistory.length;
+      el.clearHistorySelectionBtn.disabled = selectedIds.length === 0;
+      el.historySelectionCount.textContent = `${selectedIds.length} selected`;
       el.deleteHistoryBtn.textContent = selectedIds.length > 1
         ? `Delete Selected (${selectedIds.length})`
         : "Delete Selected";
@@ -842,6 +885,20 @@
       el.historyMeta.textContent = `${timestamp} · Model: ${selected.model || "Unknown"}${selected.stopped ? " · Stopped" : ""}`;
       el.historyPrompt.textContent = selected.prompt;
       el.historyOutput.textContent = selected.output;
+    }
+
+    function selectAllHistory() {
+      [...el.historySelect.options].forEach(option => {
+        option.selected = Boolean(option.value);
+      });
+      showSelectedHistory();
+      el.historySelect.focus();
+    }
+
+    function clearHistorySelection() {
+      el.historySelect.selectedIndex = -1;
+      showSelectedHistory();
+      el.historySelect.focus();
     }
 
     function saveChatToHistory({ model, prompt, output, stopped }) {
@@ -1122,6 +1179,8 @@
     el.clearOutputBtn.addEventListener("click", clearOutput);
     el.copyOutputBtn.addEventListener("click", copyOutput);
     el.historySelect.addEventListener("change", showSelectedHistory);
+    el.selectAllHistoryBtn.addEventListener("click", selectAllHistory);
+    el.clearHistorySelectionBtn.addEventListener("click", clearHistorySelection);
     el.deleteHistoryBtn.addEventListener("click", deleteSelectedHistory);
 
     const shouldLoadModels = loadSettings();

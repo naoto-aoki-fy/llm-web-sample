@@ -121,7 +121,8 @@ The target API server must support browser access, including appropriate CORS he
 11. Select **History** to review a previous user input and LLM output.
     Completed chats and partial responses from manually stopped chats are saved in
     `localStorage`. Up to 100 of the most recent chats are retained. You can select
-    one or more specific chats and delete them together.
+    one or more specific chats and delete them together. **Select All** and **Clear
+    Selection** controls make bulk selection possible without modifier keys.
 
 The additional parameters input must contain a JSON object. Its fields are passed
 through to the destination server unchanged. Support varies between OpenAI-compatible
