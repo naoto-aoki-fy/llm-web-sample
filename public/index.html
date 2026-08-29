@@ -169,6 +169,18 @@
 
     .row > * { flex: 1; }
 
+    .prompt-methods {
+      margin: 18px 0 6px;
+      padding: 0;
+      border: 0;
+    }
+
+    .prompt-methods legend {
+      padding: 0;
+      font-weight: 650;
+      color: var(--label);
+    }
+
     .checkbox-row {
       display: flex;
       gap: 10px;
@@ -429,14 +441,29 @@
           <button id="useSystemPromptBtn" type="button" class="secondary" disabled>Use Selected Prompt</button>
         </div>
 
-        <label class="checkbox-row" for="combinePromptsInput">
-          <input id="combinePromptsInput" type="checkbox" />
-          <span>Combine the system prompt with the user prompt for models that do not support system messages</span>
-        </label>
-        <div class="hint">
-          When enabled, the client sends one user message formatted as
-          <code>{system_prompt}<br><br>----<br><br>{user_prompt}</code> instead of a separate system message.
-        </div>
+        <fieldset class="prompt-methods">
+          <legend>System Prompt Input Method</legend>
+          <label class="checkbox-row">
+            <input type="radio" name="systemPromptMethod" value="system" checked />
+            <span>Send as a system message</span>
+          </label>
+          <div class="hint">Sends the system prompt with the <code>system</code> role, followed by the prompt with the <code>user</code> role.</div>
+
+          <label class="checkbox-row">
+            <input type="radio" name="systemPromptMethod" value="user" />
+            <span>Send as a separate user message</span>
+          </label>
+          <div class="hint">Sends the system prompt and the entered prompt as two consecutive <code>user</code> messages.</div>
+
+          <label class="checkbox-row">
+            <input type="radio" name="systemPromptMethod" value="combined" />
+            <span>Combine with the user prompt</span>
+          </label>
+          <div class="hint">
+            Sends one <code>user</code> message formatted as
+            <code>{system_prompt}<br><br>----<br><br>{user_prompt}</code>.
+          </div>
+        </fieldset>
         </div>
       </section>
 
@@ -535,7 +562,7 @@
       systemPromptStatus: document.getElementById("systemPromptStatus"),
       savedSystemPromptSelect: document.getElementById("savedSystemPromptSelect"),
       useSystemPromptBtn: document.getElementById("useSystemPromptBtn"),
-      combinePromptsInput: document.getElementById("combinePromptsInput"),
+      systemPromptMethodInputs: [...document.querySelectorAll('input[name="systemPromptMethod"]')],
       promptInput: document.getElementById("promptInput"),
       temperature: document.getElementById("temperature"),
       maxTokens: document.getElementById("maxTokens"),
@@ -661,7 +688,7 @@
         model: el.modelSelect.value,
         systemPromptTitle: el.systemPromptTitleInput.value,
         systemPrompt: el.systemPromptInput.value,
-        combinePrompts: el.combinePromptsInput.checked,
+        systemPromptMethod: el.systemPromptMethodInputs.find(input => input.checked)?.value || "system",
         additionalParameters: el.additionalParameters.value,
       };
       localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
@@ -680,7 +707,10 @@
         el.systemPromptInput.value = typeof preferences.systemPrompt === "string"
           ? preferences.systemPrompt
           : "";
-        el.combinePromptsInput.checked = preferences.combinePrompts === true;
+        const method = ["system", "user", "combined"].includes(preferences.systemPromptMethod)
+          ? preferences.systemPromptMethod
+          : preferences.combinePrompts === true ? "combined" : "system";
+        el.systemPromptMethodInputs.forEach(input => { input.checked = input.value === method; });
         el.additionalParameters.value = typeof preferences.additionalParameters === "string"
           ? preferences.additionalParameters
           : "";
@@ -970,8 +1000,12 @@
 
       const messages = [];
       // Preserve intentional whitespace in the system prompt; trim only to test whether it is blank.
-      if (systemPrompt.trim() && el.combinePromptsInput.checked) {
+      const systemPromptMethod = el.systemPromptMethodInputs.find(input => input.checked)?.value || "system";
+      if (systemPrompt.trim() && systemPromptMethod === "combined") {
         messages.push({ role: "user", content: `${systemPrompt}\n\n----\n\n${prompt}` });
+      } else if (systemPrompt.trim() && systemPromptMethod === "user") {
+        messages.push({ role: "user", content: systemPrompt });
+        messages.push({ role: "user", content: prompt });
       } else if (systemPrompt.trim()) {
         messages.push({ role: "system", content: systemPrompt });
         messages.push({ role: "user", content: prompt });
@@ -1172,7 +1206,7 @@
       el.useSystemPromptBtn.disabled = !el.savedSystemPromptSelect.value;
     });
     el.useSystemPromptBtn.addEventListener("click", useSelectedSystemPrompt);
-    el.combinePromptsInput.addEventListener("change", savePreferences);
+    el.systemPromptMethodInputs.forEach(input => input.addEventListener("change", savePreferences));
     el.additionalParameters.addEventListener("input", savePreferences);
     el.sendBtn.addEventListener("click", sendChatCompletion);
     el.stopBtn.addEventListener("click", stopStreaming);
