@@ -16,7 +16,7 @@ It is intended for quick local testing, lightweight demos, and checking whether 
 * No external JavaScript dependencies
 * Chat, history, and configuration modes that keep each workflow focused
 * Model list loading from `/v1/models`
-* Automatic model loading after endpoint and API key configuration, including on return visits
+* Free-form model entry before explicitly loading the available model list
 * Streaming chat response support via Server-Sent Events style responses
 * One-click copying of the LLM response to the clipboard
 * Local chat history for reviewing previously submitted user prompts and LLM responses
@@ -63,14 +63,11 @@ The target API server must support browser access, including appropriate CORS he
 
 3. Enter an API key if required by your API server.
 
-4. The API settings are saved automatically as you edit them. When both the endpoint
-   URL and API key are set, the client automatically retrieves the available models.
-   It also does this on page load when both settings were remembered from an earlier
-   visit. **Load Models** remains available to refresh the list manually or to connect
-   to an endpoint without an API key. Clear both fields to remove the saved API
-   settings.
+4. The API settings are saved automatically as you edit them. Clear both fields to
+   remove the saved API settings.
 
-5. Select a model.
+5. Enter a model ID directly, or click **Load Models** to retrieve the available models
+   and change the model field into a dropdown.
 
    The selected model is remembered in `localStorage` and selected by default the next
    time it appears in a loaded model list.

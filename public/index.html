@@ -379,8 +379,9 @@
         <div class="card">
           <h2>Model List</h2>
 
-          <label for="modelSelect">Model</label>
-          <select id="modelSelect">
+          <label id="modelLabel" for="modelInput">Model</label>
+          <input id="modelInput" type="text" placeholder="Enter a model ID" autocomplete="off" />
+          <select id="modelSelect" aria-labelledby="modelLabel" hidden>
             <option value="">No models loaded</option>
           </select>
 
@@ -554,6 +555,8 @@
       baseUrl: document.getElementById("baseUrl"),
       apiKey: document.getElementById("apiKey"),
       settingsStatus: document.getElementById("settingsStatus"),
+      modelLabel: document.getElementById("modelLabel"),
+      modelInput: document.getElementById("modelInput"),
       modelSelect: document.getElementById("modelSelect"),
       loadModelsBtn: document.getElementById("loadModelsBtn"),
       modelsStatus: document.getElementById("modelsStatus"),
@@ -657,7 +660,6 @@
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
         setStatus(el.settingsStatus, "Settings saved automatically.", "ok");
-        if (hasCompleteSettings(settings)) loadModels();
       } catch (error) {
         setStatus(el.settingsStatus, error.message, "err");
       }
@@ -686,7 +688,7 @@
 
     function savePreferences() {
       const preferences = {
-        model: el.modelSelect.value,
+        model: getSelectedModel(),
         systemPromptTitle: el.systemPromptTitleInput.value,
         systemPrompt: el.systemPromptInput.value,
         systemPromptMethod: el.systemPromptMethodInputs.find(input => input.checked)?.value || "system",
@@ -696,12 +698,17 @@
       savedModel = preferences.model;
     }
 
+    function getSelectedModel() {
+      return (el.modelSelect.hidden ? el.modelInput.value : el.modelSelect.value).trim();
+    }
+
     function loadPreferences() {
       const saved = localStorage.getItem(PREFERENCES_STORAGE_KEY);
       if (!saved) return;
       try {
         const preferences = JSON.parse(saved);
         savedModel = typeof preferences.model === "string" ? preferences.model : "";
+        el.modelInput.value = savedModel;
         el.systemPromptTitleInput.value = typeof preferences.systemPromptTitle === "string"
           ? preferences.systemPromptTitle
           : "";
@@ -810,7 +817,7 @@
         }
 
         models.sort((a, b) => a.localeCompare(b));
-        const previouslySelected = el.modelSelect.value || savedModel;
+        const previouslySelected = getSelectedModel() || savedModel;
         el.modelSelect.innerHTML = models
           .map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`)
           .join("");
@@ -818,6 +825,11 @@
         if (models.includes(previouslySelected)) {
           el.modelSelect.value = previouslySelected;
         }
+
+        el.modelInput.hidden = true;
+        el.modelSelect.hidden = false;
+        el.modelLabel.htmlFor = "modelSelect";
+        savePreferences();
 
         setStatus(el.modelsStatus, `Loaded ${models.length} models.`, "ok");
       } catch (error) {
@@ -989,7 +1001,7 @@
     }
 
     function buildChatBody() {
-      const model = el.modelSelect.value;
+      const model = getSelectedModel();
       const systemPrompt = el.systemPromptInput.value;
       const prompt = el.promptInput.value.trim();
       const temperatureRaw = el.temperature.value;
@@ -1199,6 +1211,7 @@
     el.baseUrl.addEventListener("input", scheduleSettingsSave);
     el.apiKey.addEventListener("input", scheduleSettingsSave);
     el.loadModelsBtn.addEventListener("click", loadModels);
+    el.modelInput.addEventListener("input", savePreferences);
     el.modelSelect.addEventListener("change", savePreferences);
     el.systemPromptTitleInput.addEventListener("input", savePreferences);
     el.systemPromptInput.addEventListener("input", savePreferences);
@@ -1218,12 +1231,11 @@
     el.clearHistorySelectionBtn.addEventListener("click", clearHistorySelection);
     el.deleteHistoryBtn.addEventListener("click", deleteSelectedHistory);
 
-    const shouldLoadModels = loadSettings();
+    loadSettings();
     loadPreferences();
     loadSavedSystemPrompts();
     loadChatHistory();
     selectMode("chat");
-    if (shouldLoadModels) loadModels();
   </script>
 </body>
 </html>
