@@ -408,7 +408,8 @@
           <textarea id="additionalParameters" spellcheck="false" placeholder='{"reasoning_effort": "none"}'></textarea>
           <div class="hint">
             Enter a JSON object of provider-specific settings, for example
-            <code>{"reasoning_effort": "none"}</code>. These settings are passed through to the server
+            <code>{"reasoning_effort": "none"}</code> or
+            <code>{"chat_template_kwargs": {"enable_thinking": false}}</code>. These settings are passed through to the server
             unchanged, and the destination provider may reject unsupported fields. The keys
             <code>model</code>, <code>messages</code>, <code>stream</code>, <code>temperature</code>, and
             <code>max_tokens</code> are reserved; use the dedicated fields above where available.

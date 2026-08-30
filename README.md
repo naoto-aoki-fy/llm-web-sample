@@ -112,6 +112,16 @@ The target API server must support browser access, including appropriate CORS he
    }
    ```
 
+   Or, to disable thinking for providers that support chat template arguments:
+
+   ```json
+   {
+     "chat_template_kwargs": {
+       "enable_thinking": false
+     }
+   }
+   ```
+
    This JSON text is saved as you edit it and restored on the next visit.
 
 8. Select **Chat** and enter a user prompt. Leading and trailing whitespace in the user prompt is removed
